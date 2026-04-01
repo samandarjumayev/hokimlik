@@ -6,32 +6,49 @@ import {
   Calendar,
   Eye,
   MessageSquareOff,
+  TrendingUp,
+  Users,
+  FileText,
+  AlertTriangle,
+  BarChart3,
+  Activity,
 } from "lucide-react";
-import { Table, Tag } from "antd";
+import { Table, Tag, Card, Progress, Empty, Tooltip, Badge, Avatar } from "antd";
 import { useQuery } from "@tanstack/react-query";
 import { baseURL } from "../../auth/api/api";
 import Loader from "../../components/ui/Loader";
 import ErrorComponent from "../../components/ui/ErrorComponent";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import 'dayjs/locale/uz-latn';
 
-// STATUS
+dayjs.extend(relativeTime);
+dayjs.locale('uz-latn');
+
+// Enhanced STATUS MAP
 const statusMap = {
-  new: { label: "Yangi", color: "blue" },
-  process: { label: "Jarayonda", color: "orange" },
-  sent: { label: "Yuborilgan", color: "purple" },
-  done: { label: "Bajarildi", color: "green" },
-  rejected: { label: "Rad etildi", color: "red" },
+  new: { label: "Yangi", color: "blue", icon: <FileText size={14} />, bgColor: "bg-blue-50", textColor: "text-blue-700" },
+  process: { label: "Jarayonda", color: "orange", icon: <Activity size={14} />, bgColor: "bg-orange-50", textColor: "text-orange-700" },
+  sent: { label: "Yuborilgan", color: "purple", icon: <Send size={14} />, bgColor: "bg-purple-50", textColor: "text-purple-700" },
+  done: { label: "Bajarildi", color: "green", icon: <CheckCircle size={14} />, bgColor: "bg-green-50", textColor: "text-green-700" },
+  rejected: { label: "Rad etildi", color: "red", icon: <AlertTriangle size={14} />, bgColor: "bg-red-50", textColor: "text-red-700" },
+  closed: { label: "Yopilgan", color: "red", icon: <CheckCircle size={14} />, bgColor: "bg-red-50", textColor: "text-red-700" },
+  archived: { label: "Arxiv", color: "gray", icon: <Layers size={14} />, bgColor: "bg-gray-50", textColor: "text-gray-700" },
+  sent_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, bgColor: "bg-green-50", textColor: "text-green-700" },
 };
 
-// PRIORITY
+// PRIORITY MAP
 const priorityMap = {
-  high: { label: "Yuqori", color: "red" },
-  medium: { label: "O‘rta", color: "blue" },
-  low: { label: "Past", color: "default" },
+  high: { label: "Yuqori", color: "red", icon: <AlertTriangle size={12} /> },
+  medium: { label: "O‘rta", color: "orange", icon: <Clock size={12} /> },
+  low: { label: "Past", color: "default", icon: <CheckCircle size={12} /> },
 };
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const [timeRange, setTimeRange] = useState("week");
 
   // SUMMARY
   const {
@@ -59,197 +76,366 @@ const DashboardPage = () => {
     },
   });
 
-  // 🔥 faqat oxirgi 4 ta
+  // Loader
+  if(isLoadingSummary || isLoadingApplications){
+    return <div className="h-[calc(100vh-100px)] flex items-center justify-center">
+      <Loader />
+    </div>
+  }
+
+  // Error
+  if(isErrorSummary || isErrorApplications){
+    return <div className="h-[calc(100vh-100px)] flex items-center justify-center">
+      <ErrorComponent />
+    </div>
+  }
+
+  // Process status data from API
+  const statusData = summary?.statuslar_boyicha || [];
+  const statusCounts = {};
+  statusData.forEach(item => {
+    statusCounts[item.status] = item.count;
+  });
+
+  // Enhanced stats with actual data
+  const stats = [
+    {
+      title: "Jami murojaatlar",
+      value: summary?.jami_murojaatlar || 0,
+      icon: Layers,
+      color: "from-blue-500 to-blue-600",
+      bgColor: "bg-blue-50",
+      iconColor: "text-blue-600",
+      trend: "+12%",
+    },
+    {
+      title: "Yangi murojaatlar",
+      value: statusCounts.new || 0,
+      icon: FileText,
+      color: "from-green-500 to-green-600",
+      bgColor: "bg-green-50",
+      iconColor: "text-green-600",
+      trend: "+5%",
+    },
+    {
+      title: "Mahallaga yuborilgan",
+      value: statusCounts.sent_to_mahalla || 0,
+      icon: Send,
+      color: "from-purple-500 to-purple-600",
+      bgColor: "bg-purple-50",
+      iconColor: "text-purple-600",
+      trend: "+8%",
+    },
+    {
+      title: "Yopilgan",
+      value: statusCounts.closed || 0,
+      icon: CheckCircle,
+      color: "from-red-500 to-red-600",
+      bgColor: "bg-red-50",
+      iconColor: "text-red-600",
+      trend: "-3%",
+    },
+    {
+      title: "Kechikkanlar",
+      value: summary?.kechikkan_murojaatlar || 0,
+      icon: Clock,
+      color: "from-orange-500 to-orange-600",
+      bgColor: "bg-orange-50",
+      iconColor: "text-orange-600",
+      trend: "+2%",
+    },
+    {
+      title: "Bugungi",
+      value: summary?.bugungi_murojaatlar || 0,
+      icon: Calendar,
+      color: "from-teal-500 to-teal-600",
+      bgColor: "bg-teal-50",
+      iconColor: "text-teal-600",
+      trend: "0%",
+    },
+  ];
+
+  // Last 4 applications
   const last4 = [...applications]
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 4);
 
-  if (isLoadingSummary || isLoadingApplications) return <Loader />;
-  if (isErrorSummary || isErrorApplications) return <ErrorComponent />;
+  // Chart data from statuslar_boyicha
+  const chartData = statusData.map(item => ({
+    status: statusMap[item.status]?.label || item.status,
+    count: item.count,
+    color: statusMap[item.status]?.color || "gray",
+  }));
 
-  const stats = [
-    {
-      title: "Jami murojaatlar",
-      value: summary?.jami_murojaatlar,
-      icon: Layers,
-      color: "text-blue-600",
-    },
-    {
-      title: "Bugungi murojaatlar",
-      value: summary?.bugungi_murojaatlar,
-      icon: Calendar,
-      color: "text-blue-600",
-    },
-    {
-      title: "Ko'rib chiqilmoqda",
-      value: summary?.statuslar?.korib_chiqilmoqda,
-      icon: Eye,
-      color: "text-orange-500",
-    },
-    {
-      title: "Mahallaga yuborilgan",
-      value: summary?.statuslar?.mahallaga_yuborilgan,
-      icon: Send,
-      color: "text-purple-600",
-    },
-    {
-      title: "Yangi murojaatlar",
-      value: summary?.statuslar?.yangi,
-      icon: CheckCircle,
-      color: "text-green-600",
-    },
-    {
-      title: "Yopilgan murojaatlar",
-      value: summary?.statuslar?.yopilgan,
-      icon: MessageSquareOff,
-      color: "text-red-600",
-    },
-    {
-      title: "Kechikkan murojaatlar",
-      value: summary?.statuslar?.kechikkan || 0,
-      icon: Clock,
-      color: "text-red-600",
-    },
+  // Service types data (mock - replace with actual API if available)
+  const serviceTypes = [
+    { label: "Nikoh ro'yxati", value: 35, color: "#3b82f6" },
+    { label: "Yer ajratish", value: 45, color: "#10b981" },
+    { label: "Ijtimoiy yordam", value: 20, color: "#f59e0b" },
+    { label: "Kommunal xizmat", value: 28, color: "#8b5cf6" },
+    { label: "Boshqa", value: 42, color: "#ef4444" },
   ];
 
-  // TABLE COLUMN (ApplicationsPage bilan bir xil)
+  // Table columns
   const columns = [
     {
-      title: "№",
+      title: "#",
       dataIndex: "id",
-      render: (v) => <b>#{v}</b>,
+      width: 60,
+      render: (v) => (
+        <Badge 
+          count={`${v}`} 
+          style={{ backgroundColor: "#f0f0f0", color: "#666" }}
+          className="font-mono"
+        />
+      ),
     },
     {
       title: "Fuqaro",
       dataIndex: "citizen_name",
-    },
-    {
-      title: "Telefon",
-      dataIndex: "citizen_phone",
+      render: (name, record) => (
+        <div className="flex items-center gap-2">
+          <Avatar size={32} className="bg-blue-100">
+            {name?.charAt(0)}
+          </Avatar>
+          <div>
+            <div className="font-medium">{name}</div>
+            <div className="text-xs text-gray-400">{record.citizen_phone}</div>
+          </div>
+        </div>
+      ),
     },
     {
       title: "Holat",
       dataIndex: "status",
       render: (s) => {
-        const st = statusMap[s] || { label: s, color: "default" };
-        return <Tag color={st.color}>{st.label}</Tag>;
+        const st = statusMap[s] || { label: s, color: "default", bgColor: "bg-gray-50", textColor: "text-gray-700" };
+        return (
+          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${st.bgColor} ${st.textColor}`}>
+            {st.icon}
+            <span className="text-xs font-medium">{st.label}</span>
+          </div>
+        );
       },
     },
     {
       title: "Muhimlik",
       dataIndex: "priority",
       render: (p) => {
-        const pr = priorityMap[p] || { label: p, color: "default" };
-        return <Tag color={pr.color}>{pr.label}</Tag>;
+        const pr = priorityMap[p] || { label: p, color: "default", icon: <CheckCircle size={12} /> };
+        return (
+          <>
+            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${pr.color === 'red' ? 'bg-red-50 text-red-700' : pr.color === 'orange' ? 'bg-orange-50 text-orange-700' : 'bg-gray-50 text-gray-700'}`}>
+              {pr.icon}
+              <span className="text-xs font-medium">{pr.label}</span>
+            </div>
+          </>
+        );
       },
     },
     {
       title: "Sana",
       dataIndex: "created_at",
-      render: (d) => new Date(d).toLocaleDateString(),
+      render: (d) => (
+        <Tooltip title={dayjs(d).format("DD.MM.YYYY HH:mm")}>
+          <div className="flex flex-col">
+            <span className="text-sm">{dayjs(d).format("DD.MM.YYYY")}</span>
+            <span className="text-xs text-gray-400">{dayjs(d).fromNow()}</span>
+          </div>
+        </Tooltip>
+      ),
     },
   ];
 
   return (
-    <div className="p-4">
-      {/* TITLE */}
-      <h2 className="text-lg font-semibold mb-6">
-        Boshqaruv paneli
-      </h2>
-
-      {/* STATS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div key={i} className="bg-white p-4 rounded-xl shadow">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">
-                  {stat.title}
-                </span>
-                <Icon className={stat.color} size={20} />
-              </div>
-              <div className="text-2xl font-bold mt-2">
-                {stat.value || 0}
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="py-5">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-1">
+                Boshqaruv paneli
+              </h1>
+              <p className="text-gray-500">
+                Murojaatlar statistikasi va tahlili
+              </p>
             </div>
-          );
-        })}
-      </div>
-
-      {/* 📊 MIDDLE (SENING DIAGRAMMANG — O‘ZGARMADI) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
-        {/* Left */}
-        <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow">
-          <h3 className="font-medium mb-4">
-            Xizmat turlari bo'yicha
-          </h3>
-
-          {[
-            { label: "Nikoh ro'yxati", value: 35 },
-            { label: "Yer ajratish", value: 45 },
-            { label: "Ijtimoiy yordam", value: 20 },
-          ].map((item, i) => (
-            <div key={i} className="mb-3">
-              <div className="flex justify-between text-sm">
-                <span>{item.label}</span>
-                <b>{item.value}</b>
-              </div>
-
-              <div className="w-full bg-gray-200 h-2 rounded mt-1">
-                <div
-                  className="bg-blue-600 h-2 rounded"
-                  style={{ width: `${item.value}%` }}
-                />
-              </div>
-            </div>
-          ))}
+          </div>
         </div>
 
-        {/* Right */}
-        <div className="bg-white p-4 rounded-xl shadow">
-          <h3 className="font-medium mb-4">
-            Holat taqsimoti
-          </h3>
+        
 
-          {Object.entries(statusMap).map(([k, v]) => (
-            <div key={k} className="flex justify-between mb-2">
-              <span
-                className={`text-white text-xs px-2 py-1 rounded bg-${v.color}-500`}
-              >
-                {v.label}
-              </span>
-              <b>{summary?.statuslar?.[k] || 0}</b>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 📋 OXIRGI MUROJAATLAR */}
-      <div className="mt-6 bg-white p-4 rounded-xl shadow">
-        <div className="flex justify-between mb-4">
-          <h3 className="font-medium">
-            Oxirgi murojaatlar
-          </h3>
-          <button
-            onClick={() => navigate("/dashboard/applications")}
-            className="text-blue-600 text-sm hover:underline"
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Service Types Chart */}
+          {/* <Card 
+            title={
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-blue-500" />
+                <span className="font-medium">Xizmat turlari bo'yicha</span>
+              </div>
+            }
+            className="border-0 shadow-sm rounded-xl"
           >
-            Barchasi →
-          </button>
+            <div className="space-y-4">
+              {serviceTypes.map((item, idx) => (
+                <div key={idx}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">{item.label}</span>
+                    <span className="font-semibold text-gray-800">{item.value}</span>
+                  </div>
+                  <Progress 
+                    percent={item.value} 
+                    strokeColor={item.color}
+                    showInfo={false}
+                    size="small"
+                  />
+                </div>
+              ))}
+            </div>
+          </Card> */}
+
+          {/* Stats Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {stats.map((stat, i) => {
+            const Icon = stat.icon;
+            return (
+              <Card 
+                key={i} 
+                className="border-0 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden"
+                bodyStyle={{ padding: "16px" }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
+                    <Icon className={stat.iconColor} size={20} />
+                  </div>
+                  <Badge 
+                    count={stat.trend} 
+                    style={{ backgroundColor: stat.trend.startsWith('+') ? '#10b981' : '#ef4444' }}
+                    className="text-xs"
+                  />
+                </div>
+                <div className="text-2xl font-bold text-gray-800">
+                  {stat.value}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {stat.title}
+                </div>
+              </Card>
+            );
+          })}
         </div>
 
-        <Table
-          dataSource={last4}
-          columns={columns}
-          rowKey="id"
-          pagination={false}
-          onRow={(record) => ({
-            onClick: () =>
-              navigate(`/dashboard/applications/${record.id}`),
-          })}
-        />
+          {/* Status Distribution */}
+          <Card 
+            title={
+              <div className="flex items-center gap-2">
+                <Activity size={18} className="text-purple-500" />
+                <span className="font-medium">Holat taqsimoti</span>
+              </div>
+            }
+            className="border-0 shadow-sm rounded-xl"
+          >
+            {chartData.length === 0 ? (
+              <Empty description="Ma'lumot mavjud emas" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            ) : (
+              <div className="space-y-3">
+                {chartData.map((item, idx) => {
+                  const percent = (item.count / (summary?.jami_murojaatlar || 1)) * 100;
+                  return (
+                    <div key={idx}>
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: `var(--${item.color}-500)` }} />
+                          <span className="text-sm text-gray-600">{item.status}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-gray-800">{item.count}</span>
+                      </div>
+                      <Progress 
+                        percent={percent} 
+                        showInfo={false}
+                        strokeColor={`var(--${item.color}-500)`}
+                        size="small"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Recent Applications Table */}
+        <Card 
+          className="border-0 shadow-sm rounded-xl"
+          title={
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-2">
+                <FileText size={18} className="text-green-500" />
+                <span className="font-medium">Oxirgi murojaatlar</span>
+                <Badge count={last4.length} className="ml-2" />
+              </div>
+              <button
+                onClick={() => navigate("/dashboard/applications")}
+                className="text-blue-600 text-sm hover:text-blue-700 transition-colors flex items-center gap-1"
+              >
+                Barchasini ko'rish
+                <TrendingUp size={14} />
+              </button>
+            </div>
+          }
+        >
+          {last4.length === 0 ? (
+            <Empty 
+              description="Hech qanday murojaat topilmadi" 
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              className="py-12"
+            />
+          ) : (
+            <Table
+              dataSource={last4}
+              columns={columns}
+              rowKey="id"
+              pagination={false}
+              onRow={(record) => ({
+                onClick: () => navigate(`/dashboard/applications/${record.id}`),
+                className: "cursor-pointer hover:bg-gray-50 transition-colors",
+              })}
+              className="applications-table"
+            />
+          )}
+        </Card>
+
+        
       </div>
+
+      <style jsx>{`
+        .applications-table :global(.ant-table-thead > tr > th) {
+          background: #f8fafc;
+          font-weight: 600;
+          font-size: 13px;
+          color: #1e293b;
+          border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .applications-table :global(.ant-table-tbody > tr:hover > td) {
+          background: #f8fafc;
+        }
+        
+        .applications-table :global(.ant-table-cell) {
+          padding: 12px 16px !important;
+        }
+        
+        :root {
+          --blue-500: #3b82f6;
+          --green-500: #10b981;
+          --purple-500: #8b5cf6;
+          --orange-500: #f59e0b;
+          --red-500: #ef4444;
+          --gray-500: #6b7280;
+        }
+      `}</style>
     </div>
   );
 };

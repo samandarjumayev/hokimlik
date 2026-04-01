@@ -8,7 +8,7 @@ export default function Header(){
     const navigate = useNavigate()
     const { menu } = useSelector(state => state.backend)
 
-    return <div className="relative shadow-lg sticky top-0 bg-white z-10 h-[70px] flex items-center justify-between px-5">
+    return <div className="relative z-100 shadow-lg sticky top-0 bg-white z-10 h-[70px] flex items-center justify-between px-5 pr-5">
         <button onClick={() => dispatch(toggleSidebar())} className="cursor-pointer transition-all duration-200 active:duration-75 active:duration-75 active:scale-90">
             <Menu />
         </button>
@@ -25,10 +25,7 @@ export default function Header(){
 
         {/* Hide Menu */}
         <div className={`${menu ? 'hidden' : 'flex'} flex-col gap-1 absolute top-[75px] w-[130px] shadow-lg border border-zinc-200 bg-white right-5 rounded-lg p-1`}>
-            <button className="w-full flex items-center gap-2 py-2 px-3 hover:bg-black/10 rounded cursor-pointer transition-all duration-150 active:duration-75 active:scale-95">
-                <User size={18} />
-                Profil
-            </button>
+
             <button onClick={() => {
                 dispatch(logout());
                 dispatch(toggleMenu())

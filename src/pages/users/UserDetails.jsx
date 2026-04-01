@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { baseURL } from "../../auth/api/api";
@@ -16,31 +16,78 @@ import {
   message,
   Avatar,
   Divider,
+  Row,
+  Col,
+  Statistic,
+  Tooltip,
+  Timeline,
+  Badge,
+  Alert,
 } from "antd";
 import {
   EditOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
   UserOutlined,
+  PhoneOutlined,
+  MailOutlined,
+  CalendarOutlined,
+  IdcardOutlined,
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  BuildOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 import Loader from "../../components/ui/Loader";
 import ErrorComponent from "../../components/ui/ErrorComponent";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 
-const { Title, Text } = Typography;
+dayjs.extend(relativeTime);
 
-// 🔹 Role map
+const { Title, Text, Paragraph } = Typography;
+
+// Enhanced Role map with colors, icons, and styles
 const roleMap = {
-  super_admin: "Super Admin",
-  hokim: "Hokim",
-  xodim: "Xodim",
-  oqsoqol: "Oqsoqol",
-};
-
-const roleColor = {
-  super_admin: "red",
-  hokim: "gold",
-  xodim: "blue",
-  oqsoqol: "green",
+  super_admin: { 
+    label: "Super Admin", 
+    color: "red", 
+    icon: <UserOutlined />,
+    bgColor: "bg-red-50",
+    textColor: "text-red-700",
+    borderColor: "border-red-200",
+    gradient: "from-red-500 to-red-600"
+  },
+  hokim: { 
+    label: "Hokim", 
+    color: "gold", 
+    icon: <UserOutlined />,
+    bgColor: "bg-yellow-50",
+    textColor: "text-yellow-700",
+    borderColor: "border-yellow-200",
+    gradient: "from-yellow-500 to-yellow-600"
+  },
+  xodim: { 
+    label: "Xodim", 
+    color: "blue", 
+    icon: <UserOutlined />,
+    bgColor: "bg-blue-50",
+    textColor: "text-blue-700",
+    borderColor: "border-blue-200",
+    gradient: "from-blue-500 to-blue-600"
+  },
+  oqsoqol: { 
+    label: "Oqsoqol", 
+    color: "green", 
+    icon: <UserOutlined />,
+    bgColor: "bg-green-50",
+    textColor: "text-green-700",
+    borderColor: "border-green-200",
+    gradient: "from-green-500 to-green-600"
+  },
 };
 
 export default function UserDetails() {
@@ -51,9 +98,11 @@ export default function UserDetails() {
   const [modal, setModal] = useState(false);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [additionalData, setAdditionalData] = useState(null);
 
-  // 📦 GET USER
-  const { data: user, isLoading, isError } = useQuery({
+  // GET USER
+  const { data: user, isLoading, isError, refetch } = useQuery({
     queryKey: ["user", id],
     queryFn: async () => {
       const res = await baseURL.get(`/v1/users/${id}/`);
@@ -62,7 +111,60 @@ export default function UserDetails() {
     enabled: !!id,
   });
 
-  // ✏️ UPDATE
+  // GET MAHALLAS
+  const { data: mahallas = [] } = useQuery({
+    queryKey: ["mahallas"],
+    queryFn: async () => {
+      const res = await baseURL.get("/v1/mahallas/");
+      return res.data.results || [];
+    },
+  });
+
+  // GET SERVICES
+  const { data: services = [] } = useQuery({
+    queryKey: ["services"],
+    queryFn: async () => {
+      const res = await baseURL.get("/v1/services/");
+      return res.data.results || [];
+    },
+  });
+
+  // GET MAHALLA DETAIL if user is oqsoqol
+  const { data: mahallaDetail } = useQuery({
+    queryKey: ["mahalla", user?.mahalla_id],
+    queryFn: async () => {
+      if (!user?.mahalla_id) return null;
+      const res = await baseURL.get(`/v1/mahallas/${user.mahalla_id}/`);
+      return res.data;
+    },
+    enabled: !!user?.mahalla_id && user?.role === "oqsoqol",
+  });
+
+  // GET SERVICE DETAIL if user is xodim
+  const { data: serviceDetail } = useQuery({
+    queryKey: ["service", user?.service_id],
+    queryFn: async () => {
+      if (!user?.service_id) return null;
+      const res = await baseURL.get(`/v1/services/${user.service_id}/`);
+      return res.data;
+    },
+    enabled: !!user?.service_id && user?.role === "xodim",
+  });
+
+  useEffect(() => {
+    if (user) {
+      setSelectedRole(user.role);
+      if (user.role === "oqsoqol" && mahallaDetail) {
+        setAdditionalData({ name: mahallaDetail.name, district: mahallaDetail.district });
+      } else if (user.role === "xodim" && serviceDetail) {
+        setAdditionalData({ name: serviceDetail.name });
+      } else {
+        setAdditionalData(null);
+      }
+    }
+  }, [user, mahallaDetail, serviceDetail]);
+
+  // UPDATE
   const updateMutation = useMutation({
     mutationFn: async (data) => {
       const res = await baseURL.patch(`/v1/users/${id}/`, data);
@@ -70,47 +172,53 @@ export default function UserDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["user", id]);
-      messageApi.success("Yangilandi");
+      messageApi.success({
+        content: "Foydalanuvchi ma'lumotlari yangilandi",
+        icon: <CheckCircleOutlined />,
+        duration: 3,
+      });
       setModal(false);
+      refetch();
     },
-    onError: () => {
-      messageApi.error("Xatolik yuz berdi");
+    onError: (err) => {
+      console.error("Update error:", err);
+      messageApi.error("Yangilashda xatolik yuz berdi");
     },
   });
 
-  // 🗑 DELETE
+  // DELETE
   const deleteMutation = useMutation({
     mutationFn: async () => {
       await baseURL.delete(`/v1/users/${id}/`);
     },
     onSuccess: () => {
-      messageApi.success("O‘chirildi");
+      messageApi.success("Foydalanuvchi o'chirildi");
       navigate("/dashboard/users");
     },
     onError: () => {
-      messageApi.error("O‘chirishda xatolik");
+      messageApi.error("O'chirishda xatolik yuz berdi");
     },
   });
 
-  // 🔄 Loading
+  // Loading
   if (isLoading) {
     return (
-      <div className="h-[calc(100vh-100px)] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <Loader />
       </div>
     );
   }
 
-  // ❌ Error
+  // Error
   if (isError || !user) {
     return (
-      <div className="h-[calc(100vh-100px)] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <ErrorComponent />
       </div>
     );
   }
 
-  // ✏️ Edit open
+  // Edit open
   const openEdit = () => {
     const names = user.full_name?.split(" ") || [];
     form.setFieldsValue({
@@ -119,11 +227,15 @@ export default function UserDetails() {
       username: user.username,
       phone: user.phone,
       role: user.role,
+      mahalla_id: user.mahalla_id || null,
+      service_id: user.service_id || null,
+      password: "", // Empty password field for editing
     });
+    setSelectedRole(user.role);
     setModal(true);
   };
 
-  // 💾 Save
+  // Save
   const handleSave = () => {
     form.validateFields().then((values) => {
       const payload = {
@@ -132,162 +244,518 @@ export default function UserDetails() {
         phone: values.phone,
         role: values.role,
       };
-
+      
+      // Add password if provided
+      if (values.password && values.password.trim()) {
+        payload.password = values.password;
+      }
+      
+      // Add conditional fields based on role
+      if (values.role === "oqsoqol" && values.mahalla_id) {
+        payload.mahalla_id = values.mahalla_id;
+      }
+      if (values.role === "xodim" && values.service_id) {
+        payload.service_id = values.service_id;
+      }
+      
       updateMutation.mutate(payload);
     });
   };
 
+  const role = roleMap[user.role] || { 
+    label: user.role, 
+    color: "default", 
+    icon: <UserOutlined />,
+    bgColor: "bg-gray-50",
+    textColor: "text-gray-700"
+  };
+
+  // Timeline data
+  const timelineItems = [
+    { action: "Foydalanuvchi yaratildi", date: user.created_at, icon: <UserOutlined /> },
+    ...(user.updated_at && user.updated_at !== user.created_at 
+      ? [{ action: "Ma'lumotlar yangilandi", date: user.updated_at, icon: <EditOutlined /> }]
+      : []),
+  ];
+
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {contextHolder}
 
-      {/* 🔷 HEADER */}
-      <div
-        className="flex justify-between items-center mb-5 px-4 py-3 rounded-xl"
-        style={{
-          background: "linear-gradient(135deg, #eef2ff, #f8fafc)",
-          border: "1px solid #e5e7eb",
-        }}
-      >
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate(-1)}
-          style={{ borderRadius: 8 }}
-        >
-          Orqaga
-        </Button>
+      {/* Header Section */}
+      <div className="bg-white border-b border-gray-200 shadow-sm z-10">
+        <div className="py-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate(-1)}
+              className="hover:bg-gray-100"
+              size="large"
+            >
+              Orqaga
+            </Button>
 
-        <Space>
-          <Button
-            icon={<EditOutlined />}
-            onClick={openEdit}
-            style={{
-              borderRadius: 8,
-              background: "#f0f9ff",
-              border: "1px solid #bae6fd",
-            }}
-          >
-            Tahrirlash
-          </Button>
+            <Space size="middle">
+              <Tooltip title="Tahrirlash">
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={openEdit}
+                  size="large"
+                  className="shadow-md hover:shadow-lg transition-shadow"
+                >
+                  Tahrirlash
+                </Button>
+              </Tooltip>
 
-          <Button
-            danger
-            icon={<DeleteOutlined />}
-            style={{ borderRadius: 8 }}
-            onClick={() =>
-              Modal.confirm({
-                title: "Foydalanuvchini o‘chirmoqchimisiz?",
-                okText: "Ha",
-                cancelText: "Yo‘q",
-                onOk: () => deleteMutation.mutate(),
-              })
-            }
-          >
-            O‘chirish
-          </Button>
-        </Space>
-      </div>
-
-      {/* 🔷 CARD */}
-      <Card
-        bordered={false}
-        style={{
-          borderRadius: 18,
-          background: "linear-gradient(135deg, #ffffff, #f9fafb)",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div className="flex items-center gap-4">
-          <Avatar
-            size={70}
-            icon={<UserOutlined />}
-            style={{
-              background: "linear-gradient(135deg, #6366f1, #3b82f6)",
-            }}
-          />
-
-          <div>
-            <Title level={4} style={{ margin: 0 }}>
-              {user.full_name}
-            </Title>
-
-            <Text type="secondary">@{user.username}</Text>
-
-            <div style={{ marginTop: 8 }}>
-              <Tag
-                color={roleColor[user.role]}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: 20,
-                  fontWeight: 500,
-                }}
-              >
-                {roleMap[user.role] || user.role}
-              </Tag>
-            </div>
+              <Tooltip title="O'chirish">
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  size="large"
+                  onClick={() =>
+                    Modal.confirm({
+                      title: "Foydalanuvchini o'chirish",
+                      content: (
+                        <div>
+                          <Paragraph>
+                            <Text strong>{user.full_name}</Text> foydalanuvchisini o'chirmoqchimisiz?
+                          </Paragraph>
+                          <Alert
+                            message="Diqqat!"
+                            description="Bu amalni qaytarib bo'lmaydi. Foydalanuvchi va unga tegishli barcha ma'lumotlar butunlay o'chiriladi."
+                            type="warning"
+                            showIcon
+                            className="mt-3"
+                          />
+                        </div>
+                      ),
+                      okText: "Ha, o'chirish",
+                      cancelText: "Bekor qilish",
+                      okButtonProps: { danger: true, size: "large" },
+                      cancelButtonProps: { size: "large" },
+                      width: 500,
+                      onOk: () => deleteMutation.mutate(),
+                    })
+                  }
+                >
+                  O'chirish
+                </Button>
+              </Tooltip>
+            </Space>
           </div>
         </div>
+      </div>
 
-        <Divider />
+      <div className="px-5 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - User Info */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Profile Card */}
+            <Card className="shadow-sm rounded-xl border-0 overflow-hidden">
+              <div className="relative">
+                {/* Cover Image */}
+                <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-xl"></div>
+                
+                {/* Profile Info */}
+                <div className="px-6 pb-6 relative">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 -mt-12 mb-4">
+                    <Avatar
+                      size={100}
+                      icon={<UserOutlined />}
+                      className="border-4 border-white shadow-lg"
+                      style={{
+                        background: `linear-gradient(135deg, ${role.gradient || "#6366f1"})`,
+                      }}
+                    />
+                    <div className="text-center sm:text-left flex-1">
+                      <Title level={3} className="!mb-1">
+                        {user.full_name}
+                      </Title>
+                      <div className="flex items-center gap-2 justify-center sm:justify-start">
+                        <Text type="secondary" className="text-sm">
+                          @{user.username}
+                        </Text>
+                        <Badge 
+                          count={role.label} 
+                          style={{ 
+                            backgroundColor: role.bgColor,
+                            color: role.textColor,
+                            border: `1px solid ${role.borderColor}`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-        <Descriptions column={2} size="middle">
-          <Descriptions.Item label="Telefon">
-            {user.phone || "-"}
-          </Descriptions.Item>
+                  <Divider className="my-4" />
 
-          <Descriptions.Item label="Email">
-            {user.email || "-"}
-          </Descriptions.Item>
+                  {/* Stats */}
+                  <Row gutter={[16, 16]}>
+                    <Col xs={12} sm={8}>
+                      <Statistic
+                        title="User ID"
+                        value={user.id}
+                        prefix={<IdcardOutlined className="text-blue-500" />}
+                        valueStyle={{ fontSize: 16 }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <Statistic
+                        title="Telefon"
+                        value={user.phone || "—"}
+                        prefix={<PhoneOutlined className="text-green-500" />}
+                        valueStyle={{ fontSize: 16 }}
+                      />
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <Statistic
+                        title="Qo'shilgan"
+                        value={dayjs(user.created_at).format("DD.MM.YYYY")}
+                        prefix={<CalendarOutlined className="text-purple-500" />}
+                        valueStyle={{ fontSize: 16 }}
+                      />
+                    </Col>
+                  </Row>
+                </div>
+              </div>
+            </Card>
 
-          <Descriptions.Item label="Yaratilgan sana">
-            {user.created_at
-              ? new Date(user.created_at).toLocaleString()
-              : "-"}
-          </Descriptions.Item>
+            {/* Additional Info Card */}
+            <Card className="shadow-sm rounded-xl border-0">
+              <div className="flex items-center gap-2 mb-4">
+                <FileTextOutlined className="text-blue-500 text-lg" />
+                <Title level={5} className="!mb-0">Qo'shimcha ma'lumotlar</Title>
+              </div>
+              
+              <Descriptions column={1} size="middle" bordered>
+                <Descriptions.Item label="To'liq ism">
+                  <Text strong>{user.full_name}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Username">
+                  <Text code>@{user.username}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="Rol">
+                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${role.bgColor} ${role.textColor}`}>
+                    {role.icon}
+                    <span>{role.label}</span>
+                  </div>
+                </Descriptions.Item>
+                
+                {/* Conditional fields for Oqsoqol */}
+                {user.role === "oqsoqol" && additionalData && (
+                  <>
+                    <Descriptions.Item label="Mahalla">
+                      <Space>
+                        <HomeOutlined className="text-green-500" />
+                        <Text>{additionalData.name}</Text>
+                      </Space>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Tuman">
+                      <Space>
+                        <BuildOutlined className="text-blue-500" />
+                        <Text>{additionalData.district}</Text>
+                      </Space>
+                    </Descriptions.Item>
+                  </>
+                )}
+                
+                {/* Conditional fields for Xodim */}
+                {user.role === "xodim" && additionalData && (
+                  <Descriptions.Item label="Xizmat turi">
+                    <Space>
+                      <BuildOutlined className="text-blue-500" />
+                      <Text>{additionalData.name}</Text>
+                    </Space>
+                  </Descriptions.Item>
+                )}
+                
+                <Descriptions.Item label="Yaratilgan vaqt">
+                  <div className="flex flex-col">
+                    <Text>{dayjs(user.created_at).format("DD.MM.YYYY HH:mm:ss")}</Text>
+                    <Text type="secondary" className="text-xs">
+                      {dayjs(user.created_at).fromNow()}
+                    </Text>
+                  </div>
+                </Descriptions.Item>
+                {user.updated_at && user.updated_at !== user.created_at && (
+                  <Descriptions.Item label="Oxirgi yangilanish">
+                    <div className="flex flex-col">
+                      <Text>{dayjs(user.updated_at).format("DD.MM.YYYY HH:mm:ss")}</Text>
+                      <Text type="secondary" className="text-xs">
+                        {dayjs(user.updated_at).fromNow()}
+                      </Text>
+                    </div>
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            </Card>
+          </div>
 
-          <Descriptions.Item label="User ID">
-            {user.id}
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
+          {/* Right Column - Activity Timeline */}
+          <div className="space-y-6">
+            <Card className="shadow-sm rounded-xl border-0">
+              <div className="flex items-center gap-2 mb-4">
+                <ClockCircleOutlined className="text-blue-500 text-lg" />
+                <Title level={5} className="!mb-0">Faoliyat tarixi</Title>
+              </div>
+              
+              <Timeline
+                items={timelineItems.map((item, index) => ({
+                  dot: item.icon || <ClockCircleOutlined />,
+                  color: index === 0 ? "green" : "blue",
+                  children: (
+                    <div className="pb-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+                        <Text strong>{item.action}</Text>
+                        <Text type="secondary" className="text-xs">
+                          {dayjs(item.date).format("DD.MM.YYYY HH:mm")}
+                        </Text>
+                      </div>
+                      <Text type="secondary" className="text-sm">
+                        {dayjs(item.date).fromNow()}
+                      </Text>
+                    </div>
+                  ),
+                }))}
+              />
 
-      {/* 🔷 EDIT MODAL */}
+              <Divider className="my-4" />
+
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserOutlined className="text-blue-500" />
+                  <Text strong className="text-blue-700">Statistika</Text>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Text type="secondary">Yaratilgan arizalar</Text>
+                    <Text strong>0</Text>
+                  </div>
+                  <div className="flex justify-between">
+                    <Text type="secondary">Yopilgan arizalar</Text>
+                    <Text strong>0</Text>
+                  </div>
+                  <div className="flex justify-between">
+                    <Text type="secondary">Faol arizalar</Text>
+                    <Text strong>0</Text>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Modal - Two Column Layout */}
       <Modal
-        title="Foydalanuvchini tahrirlash"
+        title={
+          <div className="flex items-center gap-2">
+            <EditOutlined className="text-blue-500" />
+            <span>Foydalanuvchini tahrirlash</span>
+          </div>
+        }
         open={modal}
         onOk={handleSave}
-        onCancel={() => setModal(false)}
+        onCancel={() => {
+          setModal(false);
+          setSelectedRole(null);
+          form.resetFields();
+        }}
         confirmLoading={updateMutation.isPending}
+        width={700}
+        okText="Saqlash"
+        cancelText="Bekor qilish"
+        className="rounded-xl"
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="first_name" label="Ism" rules={[{ required: true }]}>
-            <Input />
+        <Form form={form} layout="vertical" className="mt-4">
+          {/* First Row - First Name and Last Name */}
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="first_name" 
+                label="Ism" 
+                rules={[{ required: true, message: "Ismni kiriting" }]}
+              >
+                <Input 
+                  prefix={<UserOutlined className="text-gray-400" />}
+                  placeholder="Ism"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="last_name" 
+                label="Familiya" 
+                rules={[{ required: true, message: "Familiyani kiriting" }]}
+              >
+                <Input 
+                  prefix={<UserOutlined className="text-gray-400" />}
+                  placeholder="Familiya"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Second Row - Username and Phone */}
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="username" 
+                label="Username" 
+                rules={[{ required: true, message: "Usernameni kiriting" }]}
+              >
+                <Input 
+                  prefix={<MailOutlined className="text-gray-400" />}
+                  placeholder="username"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="phone" 
+                label="Telefon raqami"
+              >
+                <Input 
+                  prefix={<PhoneOutlined className="text-gray-400" />}
+                  placeholder="+998 90 123 45 67"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Third Row - Password (full width) */}
+          <Form.Item 
+            name="password" 
+            label="Password"
+            extra="Agar o'zgartirmoqchi bo'lmasangiz, bo'sh qoldiring"
+          >
+            <Input.Password 
+              prefix={<LockOutlined className="text-gray-400" />}
+              placeholder="Yangi parol (ixtiyoriy)"
+              size="large"
+            />
           </Form.Item>
 
-          <Form.Item name="last_name" label="Familiya" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="username" label="Username" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="phone" label="Telefon">
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="role" label="Rol" rules={[{ required: true }]}>
+          {/* Fourth Row - Role */}
+          <Form.Item 
+            name="role" 
+            label="Rol" 
+            rules={[{ required: true, message: "Rolni tanlang" }]}
+          >
             <Select
+              placeholder="Rolni tanlang"
+              size="large"
+              onChange={(value) => {
+                setSelectedRole(value);
+                form.setFieldsValue({ mahalla_id: null, service_id: null });
+              }}
               options={[
-                { value: "super_admin", label: "Super Admin" },
-                { value: "hokim", label: "Hokim" },
-                { value: "xodim", label: "Xodim" },
-                { value: "oqsoqol", label: "Oqsoqol" },
+                { 
+                  value: "super_admin", 
+                  label: (
+                    <Space>
+                      <UserOutlined className="text-red-500" />
+                      <span>Super Admin</span>
+                    </Space>
+                  )
+                },
+                { 
+                  value: "hokim", 
+                  label: (
+                    <Space>
+                      <UserOutlined className="text-yellow-500" />
+                      <span>Hokim</span>
+                    </Space>
+                  )
+                },
+                { 
+                  value: "xodim", 
+                  label: (
+                    <Space>
+                      <UserOutlined className="text-blue-500" />
+                      <span>Xodim</span>
+                    </Space>
+                  )
+                },
+                { 
+                  value: "oqsoqol", 
+                  label: (
+                    <Space>
+                      <UserOutlined className="text-green-500" />
+                      <span>Oqsoqol</span>
+                    </Space>
+                  )
+                },
               ]}
             />
           </Form.Item>
+
+          {/* Conditional field for Oqsoqol - Mahalla */}
+          {selectedRole === "oqsoqol" && (
+            <Form.Item 
+              name="mahalla_id" 
+              label="Mahalla" 
+              rules={[{ required: true, message: "Mahallani tanlang" }]}
+            >
+              <Select
+                showSearch
+                placeholder="Mahallani tanlang"
+                size="large"
+                options={mahallas.map((m) => ({
+                  value: m.id,
+                  label: `${m.name} (${m.district})`,
+                }))}
+                filterOption={(input, option) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+          )}
+
+          {/* Conditional field for Xodim - Service */}
+          {selectedRole === "xodim" && (
+            <Form.Item 
+              name="service_id" 
+              label="Xizmat turi" 
+              rules={[{ required: true, message: "Xizmat turini tanlang" }]}
+            >
+              <Select
+                showSearch
+                placeholder="Xizmat turini tanlang"
+                size="large"
+                options={services.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+                }))}
+                filterOption={(input, option) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+          )}
+
+          <Alert
+            message="Ma'lumot"
+            description="Foydalanuvchi parolini o'zgartirish uchun yuqoridagi password maydoniga yangi parolni kiriting."
+            type="info"
+            showIcon
+            className="mt-4"
+          />
         </Form>
       </Modal>
+
+      <style jsx>{`
+        .ant-descriptions-item-label {
+          background: #f8fafc;
+          font-weight: 500;
+        }
+      `}</style>
     </div>
   );
 }
