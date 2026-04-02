@@ -45,7 +45,7 @@ const AppFooter = () => {
   // Navigation links for admin pages
   const adminLinks = [
     { title: "Bosh sahifa", path: "/dashboard" },
-    { title: "Murojaatlar", path: "/dashboard/applications" },
+    { title: "hisobotlar", path: "/dashboard/applications" },
     { title: "Foydalanuvchilar", path: "/dashboard/users" },
     { title: "Statistika", path: "/dashboard/statistics" },
     { title: "Hisobotlar", path: "/dashboard/reports" },
@@ -127,7 +127,7 @@ const AppFooter = () => {
                 </Title>
               </div>
               <Text className="text-gray-600 text-sm leading-relaxed">
-                Fuqarolar murojaatlarini raqamli boshqarish va monitoring qilish tizimi.
+                Fuqarolar hisobotlarini raqamli boshqarish va monitoring qilish tizimi.
                 Hokimlik va xizmatlar o'rtasida samarali hamkorlik.
               </Text>
             </div>

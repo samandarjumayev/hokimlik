@@ -23,7 +23,7 @@ export const router = createBrowserRouter([
         // Auth bo'lishi kerak
         path: '/dashboard',
         element: (
-            <ProtectedRoute allowRoles={['super_admin', 'hokim', 'xodim']}>
+            <ProtectedRoute allowRoles={['super_admin', 'hokim', 'service_staff']}>
                 <App />
             </ProtectedRoute>
         ),
@@ -39,7 +39,7 @@ export const router = createBrowserRouter([
             {
                 path: 'applications',
                 element: (
-                    <ProtectedRoute allowRoles={['super_admin', 'hokim', 'xodim']}>
+                    <ProtectedRoute allowRoles={['super_admin', 'hokim', 'service_staff']}>
                         <ApplicationsPage />
                     </ProtectedRoute>
                 )
@@ -47,7 +47,7 @@ export const router = createBrowserRouter([
             {
                 path: 'applications/:id',
                 element: (
-                    <ProtectedRoute allowRoles={['super_admin', 'hokim', 'xodim']}>
+                    <ProtectedRoute allowRoles={['super_admin', 'hokim', 'service_staff']}>
                         <ApplicationDetailPage />
                     </ProtectedRoute>
                 )

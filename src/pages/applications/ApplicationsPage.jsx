@@ -155,7 +155,7 @@ const appTypeOptions = [
 const ApplicationsPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { role } = useSelector((state) => state.backend);
+  const { role, id, service_id } = useSelector((state) => state.backend);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState();
@@ -176,16 +176,16 @@ const ApplicationsPage = () => {
     },
   });
 
-  // FETCH SERVICES
+  // FETCH SERVICES - only for super_admin
   const { data: services = [] } = useQuery({
-  queryKey: ["services"],
-  queryFn: async () => {
-    const res = await baseURL.get("/v1/services/");
-    const allServices = res.data.results || [];
-    // Filter only active services
-    return allServices.filter(service => service.is_active === true);
-  },
-});
+    queryKey: ["services"],
+    queryFn: async () => {
+      const res = await baseURL.get("/v1/services/");
+      const allServices = res.data.results || [];
+      return allServices.filter(service => service.is_active === true);
+    },
+    enabled: role === "super_admin",
+  });
 
   // FETCH MAHALLA LIST
   const { data: mahallaList = [] } = useQuery({
@@ -205,7 +205,7 @@ const ApplicationsPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(["applications"]);
       messageApi.success({
-        content: "Murojaat muvaffaqiyatli qo'shildi",
+        content: "Hisobot muvaffaqiyatli qo'shildi",
         icon: <CheckCircleOutlined />,
         duration: 3,
       });
@@ -214,7 +214,7 @@ const ApplicationsPage = () => {
     },
     onError: (error) => {
       console.error("Create error:", error);
-      messageApi.error("Murojaat qo'shishda xatolik yuz berdi");
+      messageApi.error("Hisobot qo'shishda xatolik yuz berdi");
     },
   });
 
@@ -247,7 +247,7 @@ const ApplicationsPage = () => {
     if (role === "hokim") {
       return ["close", "reopen", "send-to-mahalla", "attachments"];
     }
-    if (role === "xodim") {
+    if (role === "service_staff") {
       return ["attachments"];
     }
     return [];
@@ -261,7 +261,7 @@ const ApplicationsPage = () => {
     attachments: "Fayllarni ko'rish",
   };
 
-  // Statistics - Fixed division by zero
+  // Statistics
   const statistics = useMemo(() => {
     const total = applications.length;
     const newCount = applications.filter(a => a.status === "new").length;
@@ -315,11 +315,17 @@ const ApplicationsPage = () => {
   // CREATE HANDLER
   const handleCreate = () => {
     form.validateFields().then((values) => {
-      createMutation.mutate({
+      const payload = {
         ...values,
         deadline: values.deadline?.format("YYYY-MM-DD"),
         status: "new",
-      });
+      };
+      
+      if (role === "service_staff" && service_id) {
+        payload.service = service_id;
+      }
+      
+      createMutation.mutate(payload);
     });
   };
 
@@ -479,43 +485,47 @@ const ApplicationsPage = () => {
     );
   }
 
+  const canCreateReport = role === "service_staff" || role === "super_admin";
+  const isSuperAdmin = role === "super_admin";
+  const isServiceStaff = role === "service_staff";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {contextHolder}
 
       {/* Header Section */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className=" sm:px-6 lg:px-8 py-6">
+        <div className="px-5 py-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <Title level={3} className="!mb-1">Murojaatlar</Title>
+              <Title level={3} className="!mb-1">Tumandagi kunlik hisobotlar</Title>
               <Text type="secondary">
-                Barcha murojaatlarni boshqaring va kuzating
+                Barcha hisobotlarni boshqaring va kuzating
               </Text>
             </div>
             
-            {(role === "xodim" || role === "super_admin") && (
+            {canCreateReport && (
               <Button 
                 type="primary" 
                 icon={<PlusOutlined />}
                 onClick={() => setModalOpen(true)}
                 size="large"
-                className="shadow-md hover:shadow-lg transition-shadow"
+                className="shadow-md hover:shadow-lg transition-shadow cursor-pointer"
               >
-                Yangi murojaat
+                Yangi hisobot
               </Button>
             )}
           </div>
         </div>
       </div>
 
-      <div className="py-8">
+      <div className="px-5 py-8">
         {/* Statistics Cards */}
         <Row gutter={[16, 16]} className="mb-6">
           <Col xs={24} sm={12} lg={6}>
             <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
               <Statistic
-                title="Jami murojaatlar"
+                title="Jami hisobotlar"
                 value={statistics.total}
                 prefix={<DashboardOutlined className="text-blue-500" />}
                 valueStyle={{ color: "#3b82f6" }}
@@ -691,7 +701,7 @@ const ApplicationsPage = () => {
             locale={{
               emptyText: (
                 <Empty
-                  description="Hech qanday murojaat topilmadi"
+                  description="Hech qanday hisobot topilmadi"
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
               ),
@@ -700,12 +710,12 @@ const ApplicationsPage = () => {
         </Card>
       </div>
 
-      {/* Create Modal */}
+      {/* Create Modal - Role based form layout */}
       <Modal
         title={
           <div className="flex items-center gap-2">
             <PlusOutlined className="text-blue-500" />
-            <span>Yangi murojaat qo'shish</span>
+            <span>Yangi hisobot qo'shish</span>
           </div>
         }
         open={modalOpen}
@@ -718,54 +728,100 @@ const ApplicationsPage = () => {
         className="rounded-xl"
       >
         <Form form={form} layout="vertical" className="mt-4">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item 
-                name="app_number" 
-                label="Ariza raqami" 
-                rules={[{ required: true, message: "Ariza raqamini kiriting" }]}
-              >
-                <Input placeholder="Masalan: A-001" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item 
-                name="service" 
-                label="Xizmat turi" 
-                rules={[{ required: true, message: "Xizmat turini tanlang" }]}
-              >
-                <Select
-                  placeholder="Xizmat turini tanlang"
-                  options={services.map(s => ({ value: s.id, label: s.name }))}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          
+          {/* Service staff form - without service field (auto filled from redux) */}
+          {isServiceStaff && (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item 
+                    name="app_number" 
+                    label="Ariza raqami" 
+                    rules={[{ required: true, message: "Ariza raqamini kiriting" }]}
+                  >
+                    <Input placeholder="Masalan: A-001" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item 
+                    name="app_type" 
+                    label="Hisobot turi" 
+                    rules={[{ required: true }]}
+                  >
+                    <Select 
+                      options={appTypeOptions.map(t => ({
+                        value: t.value,
+                        label: (
+                          <Space>
+                            {t.icon}
+                            {t.label}
+                          </Space>
+                        ),
+                      }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
 
-          <Form.Item 
-            name="app_type" 
-            label="Murojaat turi" 
-            rules={[{ required: true }]}
-          >
-            <Select 
-              options={appTypeOptions.map(t => ({
-                value: t.value,
-                label: (
-                  <Space>
-                    {t.icon}
-                    {t.label}
-                  </Space>
-                ),
-              }))}
-            />
-          </Form.Item>
+          {/* Super admin form - with service field */}
+          {isSuperAdmin && (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item 
+                    name="app_number" 
+                    label="Ariza raqami" 
+                    rules={[{ required: true, message: "Ariza raqamini kiriting" }]}
+                  >
+                    <Input placeholder="Masalan: A-001" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item 
+                    name="service" 
+                    label="Xizmat turi" 
+                    rules={[{ required: true, message: "Xizmat turini tanlang" }]}
+                  >
+                    <Select
+                      placeholder="Xizmat turini tanlang"
+                      options={services.map(s => ({ value: s.id, label: s.name }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item 
+                    name="app_type" 
+                    label="Hisobot turi" 
+                    rules={[{ required: true }]}
+                  >
+                    <Select 
+                      options={appTypeOptions.map(t => ({
+                        value: t.value,
+                        label: (
+                          <Space>
+                            {t.icon}
+                            {t.label}
+                          </Space>
+                        ),
+                      }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
 
+          {/* Common fields for both roles */}
           <Form.Item 
             name="content" 
             label="Matn" 
             rules={[{ required: true, message: "Matnni kiriting" }]}
           >
-            <Input.TextArea rows={3} placeholder="Murojaat matnini kiriting..." />
+            <Input.TextArea rows={3} placeholder="Hisobot matnini kiriting..." />
           </Form.Item>
 
           <Row gutter={16}>
@@ -844,6 +900,15 @@ const ApplicationsPage = () => {
               placeholder="Muddatni tanlang"
             />
           </Form.Item>
+
+          {/* Info message for service staff */}
+          {isServiceStaff && (
+            <div className="bg-blue-50 p-3 rounded-lg mt-2">
+              <Text type="secondary" className="text-xs">
+                ℹ️ Sizning xizmatingiz avtomatik ravishda biriktiriladi. Agar kerak bo'lsa, Admin sizning hisobotlaringizni boshqa xizmatga o'tkazishi mumkin.
+              </Text>
+            </div>
+          )}
         </Form>
       </Modal>
     </div>

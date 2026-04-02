@@ -18,7 +18,7 @@ export default function Header(){
                 <Bell size={20} />
                 <p className="absolute top-0 right-0 text-white bg-red-500 rounded-full w-4.5 h-4.5 text-[12px] flex items-center justify-center">4</p>
             </button> */}
-            <button onClick={() => dispatch(toggleMenu())} title="Admin" className="cursor-pointer bg-[#0e3b9a] text-white rounded-full p-2 transition-all duration-200">
+            <button onClick={() => dispatch(toggleMenu())} className="cursor-pointer bg-[#0e3b9a] text-white rounded-full p-2 transition-all duration-200">
                 <User size={20} />
             </button>
         </div>

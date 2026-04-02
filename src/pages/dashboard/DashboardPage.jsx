@@ -102,8 +102,8 @@ const DashboardPage = () => {
   // Enhanced stats with actual data
   const stats = [
     {
-      title: "Jami murojaatlar",
-      value: summary?.jami_murojaatlar || 0,
+      title: "Jami hisobotlar",
+      value: summary?.jami_hisobotlar || 0,
       icon: Layers,
       color: "from-blue-500 to-blue-600",
       bgColor: "bg-blue-50",
@@ -111,7 +111,7 @@ const DashboardPage = () => {
       trend: "+12%",
     },
     {
-      title: "Yangi murojaatlar",
+      title: "Yangi hisobotlar",
       value: statusCounts.new || 0,
       icon: FileText,
       color: "from-green-500 to-green-600",
@@ -139,7 +139,7 @@ const DashboardPage = () => {
     },
     {
       title: "Kechikkanlar",
-      value: summary?.kechikkan_murojaatlar || 0,
+      value: summary?.kechikkan_hisobotlar || 0,
       icon: Clock,
       color: "from-orange-500 to-orange-600",
       bgColor: "bg-orange-50",
@@ -148,7 +148,7 @@ const DashboardPage = () => {
     },
     {
       title: "Bugungi",
-      value: summary?.bugungi_murojaatlar || 0,
+      value: summary?.bugungi_hisobotlar || 0,
       icon: Calendar,
       color: "from-teal-500 to-teal-600",
       bgColor: "bg-teal-50",
@@ -263,7 +263,7 @@ const DashboardPage = () => {
                 Boshqaruv paneli
               </h1>
               <p className="text-gray-500">
-                Murojaatlar statistikasi va tahlili
+                hisobotlar statistikasi va tahlili
               </p>
             </div>
           </div>
@@ -317,7 +317,7 @@ const DashboardPage = () => {
             ) : (
               <div className="space-y-3">
                 {chartData.map((item, idx) => {
-                  const percent = (item.count / (summary?.jami_murojaatlar || 1)) * 100;
+                  const percent = (item.count / (summary?.jami_hisobotlar || 1)) * 100;
                   const getColor = () => {
                     if (item.color === "blue") return "#3b82f6";
                     if (item.color === "orange") return "#f59e0b";
@@ -357,7 +357,7 @@ const DashboardPage = () => {
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-green-500" />
-                <span className="font-medium">Oxirgi murojaatlar</span>
+                <span className="font-medium">Oxirgi hisobotlar</span>
               </div>
               <button
                 onClick={() => navigate("/dashboard/applications")}
@@ -371,7 +371,7 @@ const DashboardPage = () => {
         >
           {last4.length === 0 ? (
             <Empty 
-              description="Hech qanday murojaat topilmadi" 
+              description="Hech qanday hisobot topilmadi" 
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               className="py-12"
             />

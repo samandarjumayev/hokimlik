@@ -40,7 +40,8 @@ export default function Home() {
                         refresh: resp.data.refresh,
                         user: values.username,
                         role: resp.data.role,
-                        id: resp.data.id
+                        id: resp.data.id,
+                        service_id: 1
                     })
                 );
 
@@ -65,7 +66,7 @@ export default function Home() {
                     <div className="flex gap-3 items-center text-[16px]">
                         <span>📢 Davlat xizmatlari monitoring tizimi</span>
                         <span className="opacity-90">
-                            Barcha murojaatlarni yagona platformada boshqaring
+                            Barcha hisobotlarni yagona platformada boshqaring
                         </span>
                     </div>
 
@@ -114,7 +115,7 @@ export default function Home() {
                         </Title>
 
                         <Text className="text-gray-500 block mb-6">
-                            Fuqarolar murojaatlarini qabul qilish, nazorat qilish va
+                            Fuqarolar hisobotlarini qabul qilish, nazorat qilish va
                             tahlil qilish uchun yagona platforma
                         </Text>
 
@@ -185,7 +186,7 @@ export default function Home() {
                             </Title>
 
                             <div className="text-sm opacity-90">
-                                Tizim orqali murojaatlar, mahallalar va xizmatlar faoliyati nazorat qilinadi
+                                Tizim orqali hisobotlar, mahallalar va xizmatlar faoliyati nazorat qilinadi
                             </div>
                         </div>
 

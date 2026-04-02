@@ -150,7 +150,7 @@ const ReportsPage = () => {
   // Table columns
   const columns = [
     {
-      title: "Murojaat №",
+      title: "hisobot №",
       dataIndex: "application",
       width: 100,
       render: (v) => (
@@ -330,7 +330,7 @@ const ReportsPage = () => {
         title={
           <div className="flex items-center gap-2">
             <FileTextOutlined className="text-blue-500" />
-            <span>Murojaat tafsilotlari</span>
+            <span>hisobot tafsilotlari</span>
             {selectedReport && (
               <Badge 
                 count={`#${selectedReport.application}`}
@@ -360,7 +360,7 @@ const ReportsPage = () => {
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg">
               <Row gutter={[16, 16]}>
                 <Col span={12}>
-                  <Text type="secondary" className="text-sm">Murojaat raqami</Text>
+                  <Text type="secondary" className="text-sm">hisobot raqami</Text>
                   <Title level={4} className="!mb-0">#{applicationDetails.app_number || applicationDetails.id}</Title>
                 </Col>
                 <Col span={12}>
@@ -392,7 +392,7 @@ const ReportsPage = () => {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <MessageOutlined className="text-green-500" />
-                <Title level={5} className="!mb-0">Murojaat mazmuni</Title>
+                <Title level={5} className="!mb-0">hisobot mazmuni</Title>
               </div>
               <Paragraph className="bg-gray-50 p-3 rounded-lg">
                 {applicationDetails.content}
@@ -461,7 +461,7 @@ const ReportsPage = () => {
             )}
           </div>
         ) : (
-          <Empty description="Murojaat ma'lumotlari topilmadi" />
+          <Empty description="hisobot ma'lumotlari topilmadi" />
         )}
       </Modal>
 

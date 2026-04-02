@@ -62,7 +62,7 @@ const roleMap = {
     textColor: "text-blue-700",
     borderColor: "border-blue-200"
   },
-  xodim: { 
+  service_staff: { 
     label: "Xodim", 
     color: "green", 
     icon: <UserOutlined />,
@@ -241,7 +241,7 @@ const UsersPage = () => {
       if (values.role === "oqsoqol" && values.mahalla) {
         payload.mahalla = values.mahalla;
       }
-      if (values.role === "xodim" && values.service) {
+      if (values.role === "service_staff" && values.service) {
         payload.service = values.service;
       }
 
@@ -661,7 +661,7 @@ const UsersPage = () => {
                   )
                 },
                 { 
-                  value: "xodim", 
+                  value: "service_staff", 
                   label: (
                     <Space>
                       <UserOutlined className="text-green-500" />
@@ -705,7 +705,7 @@ const UsersPage = () => {
           )}
 
           {/* Conditional field for Xodim - Service (ONLY ACTIVE SERVICES) */}
-          {selectedRole === "xodim" && (
+          {selectedRole === "service_staff" && (
             <Form.Item 
               name="service" 
               label="Xizmat turi" 

@@ -29,8 +29,9 @@ export default function Login() {
                         access: resp.data.access,
                         refresh: resp.data.refresh,
                         user: values.username,
-                        role: resp.data.role,
-                        id: resp.data.id
+                        role: resp.data.role == 'xodim' ? 'service_staff' : resp.data.role,
+                        id: resp.data.id,
+                        service_id: 1
                     }));
                     navigate('/dashboard')
                 }
@@ -59,7 +60,7 @@ export default function Login() {
                 Kirish
             </h3>
             <p className="text-gray-500 text-sm">
-                Davlat Xizmatlari Murojaatlarini Monitoring Qilish va Nazorat Tizimi
+                Davlat Xizmatlari hisobotlarini Monitoring Qilish va Nazorat Tizimi
             </p>
             </div>
 

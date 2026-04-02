@@ -20,10 +20,10 @@ export default function Sidebar() {
             roles: ["super_admin", "hokim"]
         },
         {
-            label: "Murojaatlar",
+            label: "Tumandagi kunlik hisobotlar",
             path: "/dashboard/applications",
             icon: ClipboardList,
-            roles: ["super_admin", "hokim", "xodim"]
+            roles: ["super_admin", "hokim", "service_staff"]
         },
         {
             label: "Mahalla hisobotlari",
@@ -58,7 +58,7 @@ export default function Sidebar() {
     ];
 
     return (
-        <div className={`${sidebar ? 'w-[80px]' : 'w-[270px]'} h-full bg-[#051538] flex flex-col gap-2 text-white transition-all duration-200`}>
+        <div className={`${sidebar ? 'w-[80px]' : 'w-[300px]'} h-full bg-[#051538] flex flex-col gap-2 text-white transition-all duration-200`}>
             
             <div className="h-[70px] border-b border-[#072b789f] flex items-center">
                 <div className="w-18 h-14 rounded-xl bg-gradient-to-br from-blue-800 to-blue-500 flex items-center justify-center scale-60 text-white text-2xl font-bold">
