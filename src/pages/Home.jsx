@@ -73,7 +73,7 @@ export default function Home() {
                     <div className="flex gap-4">
                         <button
                             onClick={() => navigate("/login")}
-                            className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-lg py-1.5 px-3 transition-all duration-200"
+                            className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-lg py-1.5 px-3 transition-all duration-200 cursor-pointer"
                         >
                             <LogIn size={16} />
                             <span className="font-medium">Kirish</span>
@@ -112,7 +112,7 @@ export default function Home() {
                     {/* Login & Hero Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* LEFT - Login Form */}
-                        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 flex flex-col justify-center">
                             <div className="mb-6">
                                 <div className="flex items-center gap-3 h-12">
                                     <div className="w-12 h-full bg-blue-100 rounded-xl flex items-center justify-center mb-4">
