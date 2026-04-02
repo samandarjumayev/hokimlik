@@ -106,6 +106,7 @@ export default function UserDetails() {
     queryKey: ["user", id],
     queryFn: async () => {
       const res = await baseURL.get(`/v1/users/${id}/`);
+      console.log("Fetched user data:", res.data);
       return res.data;
     },
     enabled: !!id,
@@ -121,7 +122,7 @@ export default function UserDetails() {
   });
 
   // GET SERVICES
-  const { data: services = [] } = useQuery({
+  const { data: services = [], isLoading: isServicesLoading, isError: isServicesError } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       const res = await baseURL.get("/v1/services/");

@@ -229,8 +229,8 @@ export default function ApplicationDetailPage() {
       {contextHolder}
 
       {/* Hero Section */}
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-5 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <Space size="middle">
               <Button 
@@ -322,7 +322,7 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className=" py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">

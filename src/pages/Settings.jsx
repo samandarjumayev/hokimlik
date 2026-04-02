@@ -20,6 +20,7 @@ import { useSelector } from "react-redux";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/ui/Loader";
+import ErrorComponent from "../components/ui/ErrorComponent";
 
 const { Title, Text } = Typography;
 

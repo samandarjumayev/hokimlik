@@ -5,13 +5,13 @@ import ProtectedRoute from "./ProtectedRoute";
 import DashboardPage from "../pages/dashboard/DashboardPage";
 import Home from "../pages/Home";
 import ApplicationsPage from "../pages/applications/ApplicationsPage";
-import MonitoringPage from "../pages/monitoring/MonitoringPage";
 import ReportsPage from "../pages/reports/ReportsPage";
 import MahallasPages from "../pages/mahallas/MahallasPage";
 import UsersPage from "../pages/users/UsersPage";
 import Settings from "../pages/Settings";
 import UserDetails from "../pages/users/UserDetails";
 import ApplicationDetailPage from "../pages/applications/ApplicationDetailPage";
+import Services from "../pages/services/Services";
 
 
 export const router = createBrowserRouter([
@@ -53,14 +53,6 @@ export const router = createBrowserRouter([
                 )
             },
             {
-                path: 'monitoring',
-                element: (
-                    <ProtectedRoute allowRoles={['super_admin', 'hokim']}>
-                        <MonitoringPage />
-                    </ProtectedRoute>
-                )
-            },
-            {
                 path: 'mahalla-reports',
                 element: (
                     <ProtectedRoute allowRoles={['super_admin', 'hokim']}>
@@ -89,6 +81,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute allowRoles={['super_admin', 'hokim']}>
                         <UserDetails />
+                    </ProtectedRoute>
+                )
+            },
+            {
+                path: 'services',
+                element: (
+                    <ProtectedRoute allowRoles={['super_admin']}>
+                        <Services />
                     </ProtectedRoute>
                 )
             },

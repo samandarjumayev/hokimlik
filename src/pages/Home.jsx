@@ -40,6 +40,7 @@ export default function Home() {
                         refresh: resp.data.refresh,
                         user: values.username,
                         role: resp.data.role,
+                        id: resp.data.id
                     })
                 );
 

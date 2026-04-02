@@ -22,14 +22,18 @@ export default function Login() {
             try{
                 let resp = await baseURL.post('/v1/auth/login/', values);
                 console.log(resp.data);
-                dispatch(login({
-                    access: resp.data.access,
-                    refresh: resp.data.refresh,
-                    user: values.username,
-                    role: resp.data.role,
-                    id: resp.data.id
-                }));
-                navigate('/dashboard')
+                if(resp.data.role === 'oqsoqol'){
+                    navigate('/')
+                } else {
+                    dispatch(login({
+                        access: resp.data.access,
+                        refresh: resp.data.refresh,
+                        user: values.username,
+                        role: resp.data.role,
+                        id: resp.data.id
+                    }));
+                    navigate('/dashboard')
+                }
             }catch(xatolik){
                 alert(xatolik)
             }

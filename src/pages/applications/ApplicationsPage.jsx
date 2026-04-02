@@ -178,12 +178,14 @@ const ApplicationsPage = () => {
 
   // FETCH SERVICES
   const { data: services = [] } = useQuery({
-    queryKey: ["services"],
-    queryFn: async () => {
-      const res = await baseURL.get("/v1/services/");
-      return res.data.results || [];
-    },
-  });
+  queryKey: ["services"],
+  queryFn: async () => {
+    const res = await baseURL.get("/v1/services/");
+    const allServices = res.data.results || [];
+    // Filter only active services
+    return allServices.filter(service => service.is_active === true);
+  },
+});
 
   // FETCH MAHALLA LIST
   const { data: mahallaList = [] } = useQuery({

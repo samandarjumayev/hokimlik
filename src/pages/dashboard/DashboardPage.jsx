@@ -374,7 +374,6 @@ const DashboardPage = () => {
               <div className="flex items-center gap-2">
                 <FileText size={18} className="text-green-500" />
                 <span className="font-medium">Oxirgi murojaatlar</span>
-                <Badge count={last4.length} className="ml-2" />
               </div>
               <button
                 onClick={() => navigate("/dashboard/applications")}

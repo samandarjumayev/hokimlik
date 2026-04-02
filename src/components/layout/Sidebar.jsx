@@ -6,7 +6,7 @@ import {
     Gauge,
     MapPin,
     Settings,
-    Users
+    Users, Landmark
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -26,12 +26,6 @@ export default function Sidebar() {
             roles: ["super_admin", "hokim", "xodim"]
         },
         {
-            label: "Monitoring",
-            path: "/dashboard/monitoring",
-            icon: ChartColumn,
-            roles: ["super_admin", "hokim"]
-        },
-        {
             label: "Mahalla hisobotlari",
             path: "/dashboard/mahalla-reports",
             icon: Gauge,
@@ -47,6 +41,12 @@ export default function Sidebar() {
             label: "Foydalanuvchilar",
             path: "/dashboard/users",
             icon: Users,
+            roles: ["super_admin"]
+        },
+        {
+            label: "Servislar",
+            path: "/dashboard/services",
+            icon: Landmark,
             roles: ["super_admin"]
         },
         {
