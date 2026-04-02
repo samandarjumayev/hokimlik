@@ -41,7 +41,7 @@ export default function Home() {
                         user: values.username,
                         role: resp.data.role,
                         id: resp.data.id,
-                        service_id: 1
+                        service_id: resp.data.service || null
                     })
                 );
 

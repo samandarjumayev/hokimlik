@@ -31,7 +31,7 @@ export default function Login() {
                         user: values.username,
                         role: resp.data.role == 'xodim' ? 'service_staff' : resp.data.role,
                         id: resp.data.id,
-                        service_id: 1
+                        service_id: resp.data.service || null
                     }));
                     navigate('/dashboard')
                 }
