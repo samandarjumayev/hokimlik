@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// const URL = "http://docnarpay.evodevtech.uz/api";
-const URL = "http://13.51.166.59/api";
+const URL = "http://docnarpay.evodevtech.uz/api";
+// const URL = "http://13.51.166.59/api";
 
 // 🔹 instance
 export const baseURL = axios.create({

@@ -320,9 +320,12 @@ const ApplicationsPage = () => {
         deadline: values.deadline?.format("YYYY-MM-DD"),
         status: "new",
       };
+
+      const servisIDTemp = localStorage.getItem('service_id');
+      console.log("aaa",servisIDTemp, role)
       
-      if (role === "service_staff" && service_id) {
-        payload.service = service_id;
+      if (role === "service_staff" && servisIDTemp) {
+        payload.service = servisIDTemp;
       }
       
       createMutation.mutate(payload);
