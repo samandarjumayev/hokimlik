@@ -590,20 +590,6 @@ const ApplicationsPage = () => {
 
         {/* Main Card */}
         <Card className="shadow-sm rounded-xl border-0">
-          {/* Tabs */}
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            items={[
-              { key: "all", label: "Barchasi" },
-              { key: "new", label: "Yangi" },
-              { key: "in_review", label: "Ko'rib chiqilmoqda" },
-              { key: "sent_to_mahalla", label: "Mahallaga yuborilgan" },
-              { key: "closed", label: "Yopilgan" },
-              { key: "high-priority", label: "Yuqori muhimlik" },
-            ]}
-            className="mb-4"
-          />
 
           {/* Filters Section */}
           <div className="mb-4">
