@@ -121,12 +121,14 @@ const UsersPage = () => {
     }
   });
 
-  // GET services
+  // GET services - ONLY ACTIVE SERVICES
   const { data: services = [], isLoading: isServicesLoading, isError: isServicesError } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       const res = await baseURL.get("/v1/services/");
-      return res.data.results || [];
+      const allServices = res.data.results || [];
+      // Filter only active services
+      return allServices.filter(service => service.is_active === true);
     } 
   });
 
@@ -702,10 +704,10 @@ const UsersPage = () => {
             </Form.Item>
           )}
 
-          {/* Conditional field for Xodim - Service */}
+          {/* Conditional field for Xodim - Service (ONLY ACTIVE SERVICES) */}
           {selectedRole === "xodim" && (
             <Form.Item 
-              name="service_id" 
+              name="service" 
               label="Xizmat turi" 
               rules={[{ required: true, message: "Xizmat turini tanlang" }]}
             >
