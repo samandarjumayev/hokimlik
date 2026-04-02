@@ -92,7 +92,9 @@ const UsersPage = () => {
 
   // PAGINATION STATE
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [total, setTotal] = useState(0);
+  const [allUsers, setAllUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
 
   // Watch role changes
   const watchRole = Form.useWatch('role', form);
@@ -101,16 +103,52 @@ const UsersPage = () => {
     setSelectedRole(watchRole);
   }, [watchRole]);
 
-  // GET users with server-side pagination
-  const { data, isLoading, isError, refetch, } = useQuery({
-    queryKey: ["users", page],
+  // GET users with custom pagination handling
+  const { isLoading, isError, refetch } = useQuery({
+    queryKey: ["users"],
     queryFn: async () => {
-      const res = await baseURL.get(`/v1/users/?page=${page}`);
-      console.log(res.data)
-      return res.data;
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let nextUrl = null;
+
+      while (hasMore) {
+        const url = nextUrl || `/v1/users/?page=${currentPage}`;
+        const res = await baseURL.get(url);
+        const data = res.data;
+        
+        allResults = [...allResults, ...(data.results || [])];
+        
+        if (data.next) {
+          nextUrl = data.next;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setTotal(allResults.length);
+      setAllUsers(allResults);
+      setFilteredUsers(allResults);
+      return allResults;
     },
-    keepPreviousData: true,
   });
+
+  // Filter users based on search (from all users)
+  useEffect(() => {
+    if (!search.trim()) {
+      setFilteredUsers(allUsers);
+    } else {
+      const filtered = allUsers.filter(
+        (u) =>
+          u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+          u.phone?.includes(search) ||
+          u.username?.toLowerCase().includes(search.toLowerCase())
+      );
+      setFilteredUsers(filtered);
+      setPage(1); // Reset to first page when search changes
+    }
+  }, [search, allUsers]);
 
   // GET mahallas
   const { data: mahallas = [], isLoading: isMahallaLoading, isError: isMahallaError } = useQuery({
@@ -127,21 +165,27 @@ const UsersPage = () => {
     queryFn: async () => {
       const res = await baseURL.get("/v1/services/");
       const allServices = res.data.results || [];
-      // Filter only active services
       return allServices.filter(service => service.is_active === true);
     } 
   });
 
-  const users = data?.results || [];
-  const total = data?.count || 0;
+  // Get current page users (10 items per page) from filtered users
+  const getCurrentPageUsers = () => {
+    const start = (page - 1) * 10;
+    const end = start + 10;
+    return filteredUsers.slice(start, end);
+  };
 
-  // Statistics - updated for 4 roles
+  const users = getCurrentPageUsers();
+  const totalUsers = filteredUsers.length;
+
+  // Statistics - updated for 4 roles (from all users, not filtered)
   const statistics = {
-    total: total,
-    superAdmins: users.filter(u => u.role === "super_admin").length,
-    hokims: users.filter(u => u.role === "hokim").length,
-    xodims: users.filter(u => u.role === "xodim").length,
-    oqsoqols: users.filter(u => u.role === "oqsoqol").length,
+    total: allUsers.length,
+    superAdmins: allUsers.filter(u => u.role === "super_admin").length,
+    hokims: allUsers.filter(u => u.role === "hokim").length,
+    xodims: allUsers.filter(u => u.role === "service_staff").length,
+    oqsoqols: allUsers.filter(u => u.role === "oqsoqol").length,
   };
 
   // POST user
@@ -249,14 +293,6 @@ const UsersPage = () => {
       else addMutation.mutate(payload);
     });
   };
-
-  // Filter (faqat current page ichida)
-  const filtered = users?.filter(
-    (u) =>
-      u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      u.phone?.includes(search) ||
-      u.username?.toLowerCase().includes(search.toLowerCase())
-  );
 
   // Enhanced Columns
   const columns = [
@@ -389,7 +425,7 @@ const UsersPage = () => {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <Title level={3} className="!mb-1">
-                Foydalanuvchilar ({total})
+                Foydalanuvchilar ({allUsers.length})
               </Title>
               <Text type="secondary">
                 Tizim foydalanuvchilarini boshqaring va nazorat qiling
@@ -412,16 +448,6 @@ const UsersPage = () => {
       <div className="py-8">
         {/* Statistics Cards - updated for 4 roles */}
         <Row gutter={[16, 16]} className="mb-6">
-          {/* <Col xs={24} sm={12} lg={6}>
-            <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
-              <Statistic
-                title="Jami foydalanuvchilar"
-                value={statistics.total}
-                prefix={<TeamOutlined className="text-blue-500" />}
-                valueStyle={{ color: "#3b82f6" }}
-              />
-            </Card>
-          </Col> */}
           <Col xs={24} sm={12} lg={6}>
             <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
               <Statistic
@@ -502,17 +528,17 @@ const UsersPage = () => {
           {/* Info Bar */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <Badge 
-              count={filtered.length} 
+              count={totalUsers} 
               showZero 
             />
             <Text type="secondary" className="text-sm">
-              {filtered.length === 0 ? "Hech qanday foydalanuvchi topilmadi" : `${filtered.length} ta foydalanuvchi ko'rsatilmoqda`}
+              {totalUsers === 0 ? "Hech qanday foydalanuvchi topilmadi" : `${totalUsers} ta foydalanuvchi ko'rsatilmoqda`}
             </Text>
           </div>
 
           {/* Table */}
           <Table
-            dataSource={filtered}
+            dataSource={users}
             columns={columns}
             rowKey="id"
             onRow={(record) => ({
@@ -521,8 +547,8 @@ const UsersPage = () => {
             })}
             pagination={{
               current: page,
-              pageSize,
-              total,
+              pageSize: 10,
+              total: totalUsers,
               onChange: (p) => setPage(p),
               showSizeChanger: false,
               showTotal: (total, range) => `${range[0]}-${range[1]} dan ${total} ta`,

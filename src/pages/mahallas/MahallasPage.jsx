@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Table,
@@ -47,30 +47,69 @@ const MahallasPage = () => {
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize] = useState(10);
+  const [allMahallas, setAllMahallas] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [filteredMahallas, setFilteredMahallas] = useState([]);
 
-  // GET Mahallas with server-side pagination
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["mahallas", page],
+  // GET all Mahallas
+  const { isLoading, isError, refetch } = useQuery({
+    queryKey: ["mahallas"],
     queryFn: async () => {
-      const res = await baseURL.get(`/v1/mahallas/?page=${page}`);
-      return res.data;
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let nextUrl = null;
+
+      while (hasMore) {
+        const url = nextUrl || `/v1/mahallas/?page=${currentPage}`;
+        const res = await baseURL.get(url);
+        const data = res.data;
+        
+        allResults = [...allResults, ...(data.results || [])];
+        
+        if (data.next) {
+          nextUrl = data.next;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setAllMahallas(allResults);
+      setTotal(allResults.length);
+      setFilteredMahallas(allResults);
+      return allResults;
     },
-    keepPreviousData: true,
   });
 
-  const mahallas = data?.results || [];
-  const total = data?.count || 0;
-
   // Filter mahallas by search
-  const filtered = mahallas.filter(
-    (m) =>
-      m.name?.toLowerCase().includes(search.toLowerCase()) ||
-      m.district?.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (!search.trim()) {
+      setFilteredMahallas(allMahallas);
+    } else {
+      const filtered = allMahallas.filter(
+        (m) =>
+          m.name?.toLowerCase().includes(search.toLowerCase()) ||
+          m.district?.toLowerCase().includes(search.toLowerCase())
+      );
+      setFilteredMahallas(filtered);
+      setPage(1);
+    }
+  }, [search, allMahallas]);
+
+  // Get current page mahallas
+  const getCurrentPageMahallas = () => {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    return filteredMahallas.slice(start, end);
+  };
+
+  const currentMahallas = getCurrentPageMahallas();
+  const totalFiltered = filteredMahallas.length;
 
   // Statistics
-  const uniqueDistricts = [...new Set(mahallas.map(m => m.district))];
+  const uniqueDistricts = [...new Set(allMahallas.map(m => m.district))];
 
   // POST Mahalla
   const addMutation = useMutation({
@@ -280,7 +319,7 @@ const MahallasPage = () => {
               <div className="flex items-center gap-2 mb-1">
                 <HomeOutlined className="text-blue-500 text-xl" />
                 <Title level={3} className="!mb-0">
-                  Mahallalar ({total})
+                  Mahallalar ({allMahallas.length})
                 </Title>
               </div>
               <Text type="secondary">
@@ -301,7 +340,8 @@ const MahallasPage = () => {
         </div>
       </div>
 
-      <div className="pt-4 pb-8">
+      <div className="py-8">
+
         {/* Main Card */}
         <Card className="shadow-sm rounded-xl border-0">
           {/* Search */}
@@ -340,28 +380,27 @@ const MahallasPage = () => {
           {/* Info Bar */}
           <div className="flex items-center justify-between mb-4">
             <Badge 
-              count={filtered.length} 
+              count={totalFiltered} 
               showZero 
             />
             <Text type="secondary" className="text-sm">
-              {filtered.length === 0 
+              {totalFiltered === 0 
                 ? "Hech qanday mahalla topilmadi" 
-                : `${filtered.length} ta mahalla ko'rsatilmoqda`}
+                : `${totalFiltered} ta mahalla ko'rsatilmoqda`}
             </Text>
           </div>
 
           {/* Table */}
           <Table
-            dataSource={filtered}
+            dataSource={currentMahallas}
             columns={columns}
             rowKey="id"
             pagination={{
               current: page,
-              pageSize,
-              total,
+              pageSize: pageSize,
+              total: totalFiltered,
               onChange: (p) => setPage(p),
               showSizeChanger: false,
-              showTotal: (total, range) => `${range[0]}-${range[1]} dan ${total} ta`,
             }}
             locale={{
               emptyText: (

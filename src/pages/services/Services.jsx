@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Table,
@@ -48,31 +48,84 @@ const Services = () => {
   const [editingService, setEditingService] = useState(null);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
-  const [statusFilter, setStatusFilter] = useState("active"); // 'all', 'active', 'inactive'
+  const [statusFilter, setStatusFilter] = useState("all"); // 'all', 'active', 'inactive'
   const queryClient = useQueryClient();
 
   // Pagination state
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [allServices, setAllServices] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [filteredServices, setFilteredServices] = useState([]);
 
-  // GET services with server-side pagination
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["services", page],
+  // GET all services
+  const { isLoading, isError, refetch } = useQuery({
+    queryKey: ["services"],
     queryFn: async () => {
-      const res = await baseURL.get(`/v1/services/?page=${page}`);
-      return res.data;
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+      let nextUrl = null;
+
+      while (hasMore) {
+        const url = nextUrl || `/v1/services/?page=${currentPage}`;
+        const res = await baseURL.get(url);
+        const data = res.data;
+        
+        allResults = [...allResults, ...(data.results || [])];
+        
+        if (data.next) {
+          nextUrl = data.next;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      setAllServices(allResults);
+      setTotal(allResults.length);
+      setFilteredServices(allResults);
+      return allResults;
     },
-    keepPreviousData: true,
   });
 
-  const services = data?.results || [];
-  const total = data?.count || 0;
+  // Filter by status and search
+  useEffect(() => {
+    let filtered = allServices;
+    
+    // Filter by status
+    if (statusFilter === "active") {
+      filtered = filtered.filter(s => s.is_active === true);
+    } else if (statusFilter === "inactive") {
+      filtered = filtered.filter(s => s.is_active === false);
+    }
+    
+    // Filter by search
+    if (search.trim()) {
+      filtered = filtered.filter(s => 
+        s.name?.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+    
+    setFilteredServices(filtered);
+    setPage(1);
+  }, [search, statusFilter, allServices]);
+
+  // Get current page services
+  const getCurrentPageServices = () => {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
+    return filteredServices.slice(start, end);
+  };
+
+  const currentServices = getCurrentPageServices();
+  const totalFiltered = filteredServices.length;
 
   // Statistics
   const statistics = {
-    total: total,
-    active: services.filter(s => s.is_active === true).length,
-    inactive: services.filter(s => s.is_active === false).length,
+    total: allServices.length,
+    active: allServices.filter(s => s.is_active === true).length,
+    inactive: allServices.filter(s => s.is_active === false).length,
   };
 
   // POST service
@@ -165,7 +218,7 @@ const Services = () => {
     form.validateFields().then((values) => {
       const payload = {
         name: values.name,
-        is_active: true, // Default active when creating
+        is_active: true,
       };
 
       if (editingService) {
@@ -176,23 +229,13 @@ const Services = () => {
     });
   };
 
-  // Filter by status and search
-  const filtered = services?.filter((s) => {
-    const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = 
-      statusFilter === "all" ? true :
-      statusFilter === "active" ? s.is_active === true :
-      statusFilter === "inactive" ? s.is_active === false : true;
-    return matchesSearch && matchesStatus;
-  });
-
   // Table columns
   const columns = [
     {
       title: "№",
       dataIndex: "id",
       width: 80,
-      render: (v, _, index) => (
+      render: (_, __, index) => (
         <Badge 
           count={index + 1 + (page - 1) * pageSize}
           style={{ backgroundColor: "#f0f0f0", color: "#666" }}
@@ -227,6 +270,18 @@ const Services = () => {
           <Tag color={isActive ? "green" : "red"} icon={isActive ? <CheckCircleOutlined /> : <CloseCircleOutlined />}>
             {isActive ? "Faol" : "Nofaol"}
           </Tag>
+          <Tooltip title={isActive ? "Nofaol qilish" : "Faol qilish"}>
+            <Button
+              type="text"
+              size="small"
+              icon={isActive ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleActiveMutation.mutate({ id: record.id, isActive });
+              }}
+              className={isActive ? "hover:text-red-500" : "hover:text-green-500"}
+            />
+          </Tooltip>
         </div>
       ),
     },
@@ -312,7 +367,7 @@ const Services = () => {
               <div className="flex items-center gap-2 mb-1">
                 <ApiOutlined className="text-blue-500 text-xl" />
                 <Title level={3} className="!mb-0">
-                  Xizmatlar ({total})
+                  Xizmatlar ({allServices.length})
                 </Title>
               </div>
               <Text type="secondary">
@@ -334,6 +389,49 @@ const Services = () => {
       </div>
 
       <div className="py-8">
+        {/* Statistics Cards */}
+        <Row gutter={[16, 16]} className="mb-6">
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text type="secondary" className="text-sm">Jami xizmatlar</Text>
+                  <div className="text-2xl font-bold text-gray-800 mt-1">{statistics.total}</div>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
+                  <ApiOutlined className="text-blue-500 text-xl" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text type="secondary" className="text-sm">Faol xizmatlar</Text>
+                  <div className="text-2xl font-bold text-green-600 mt-1">{statistics.active}</div>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
+                  <CheckCircleOutlined className="text-green-500 text-xl" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={8}>
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Text type="secondary" className="text-sm">Nofaol xizmatlar</Text>
+                  <div className="text-2xl font-bold text-red-600 mt-1">{statistics.inactive}</div>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                  <CloseCircleOutlined className="text-red-500 text-xl" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+
         {/* Main Card */}
         <Card className="shadow-sm rounded-xl border-0">
           {/* Filter Tabs */}
@@ -347,19 +445,19 @@ const Services = () => {
                 <Radio.Button value="all">
                   <Space>
                     <ApiOutlined />
-                    Barchasi
+                    Barchasi ({statistics.total})
                   </Space>
                 </Radio.Button>
                 <Radio.Button value="active">
                   <Space>
                     <CheckCircleOutlined />
-                    Faol xizmatlar
+                    Faol xizmatlar ({statistics.active})
                   </Space>
                 </Radio.Button>
                 <Radio.Button value="inactive">
                   <Space>
                     <CloseCircleOutlined />
-                    Nofaol xizmatlar
+                    Nofaol xizmatlar ({statistics.inactive})
                   </Space>
                 </Radio.Button>
               </Radio.Group>
@@ -397,25 +495,29 @@ const Services = () => {
           {/* Info Bar */}
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <Badge 
-              count={filtered.length} 
+              count={totalFiltered} 
               showZero 
             />
             <Text type="secondary" className="text-sm">
-              {filtered.length === 0 
-                ? `Hech qanday ${statusFilter === "active" ? "faol" : statusFilter === "inactive" ? "nofaol" : ""} xizmat topilmadi` 
-                : `${filtered.length} ta xizmat ko'rsatilmoqda`}
+              {totalFiltered === 0 
+                ? statusFilter === "active" 
+                  ? "Faol xizmatlar mavjud emas"
+                  : statusFilter === "inactive"
+                  ? "Nofaol xizmatlar mavjud emas"
+                  : "Hech qanday xizmat topilmadi"
+                : `${totalFiltered} ta xizmat ko'rsatilmoqda`}
             </Text>
           </div>
 
           {/* Table */}
           <Table
-            dataSource={filtered}
+            dataSource={currentServices}
             columns={columns}
             rowKey="id"
             pagination={{
               current: page,
-              pageSize,
-              total,
+              pageSize: pageSize,
+              total: totalFiltered,
               onChange: (p) => setPage(p),
               showSizeChanger: false,
               showTotal: (total, range) => `${range[0]}-${range[1]} dan ${total} ta`,
