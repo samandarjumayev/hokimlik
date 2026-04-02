@@ -66,15 +66,28 @@ dayjs.extend(utc);
 
 const { Title, Text, Paragraph } = Typography;
 
+// Status Map - Correct workflow order
+// Workflow: 
+// 1. new (Yangi) - step 0, percent 0
+// 2. sent_to_mahalla (Mahallaga yuborilgan) - step 1, percent 20
+// 3. acknowledged (Qabul qilindi) - step 2, percent 40
+// 4. in_review (Ko'rib chiqilmoqda) - step 3, percent 60
+// 5. inspected (Tekshirildi) - step 4, percent 80
+// 6. closed (Yopilgan) - step 5, percent 100
 const statusMap = {
-  new: { label: "Yangi", color: "blue", icon: <FileText size={14} />, status: "processing" },
-  closed: { label: "Yopilgan", color: "error", icon: <CheckCircle size={14} />, status: "error" },
-  reopened: { label: "Qayta ochilgan", color: "orange", icon: <RotateCcw size={14} />, status: "warning" },
-  archive: { label: "Arxiv", color: "default", icon: <Archive size={14} />, status: "default" },
-  "send-to-mahalla": { label: "Mahallaga yuborilgan", color: "success", icon: <Send size={14} />, status: "success" },
+  new: { label: "Yangi", color: "blue", icon: <FileText size={14} />, status: "processing", step: 0, percent: 0 },
+  sent_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "active", step: 1, percent: 20 },
+  acknowledged: { label: "Qabul qilindi", color: "cyan", icon: <CheckCircle size={14} />, status: "active", step: 2, percent: 40 },
+  in_review: { label: "Ko'rib chiqilmoqda", color: "orange", icon: <Eye size={14} />, status: "active", step: 3, percent: 60 },
+  inspected: { label: "Tekshirildi", color: "purple", icon: <CheckCircle size={14} />, status: "active", step: 4, percent: 80 },
+  closed: { label: "Yopilgan", color: "red", icon: <CheckCircle size={14} />, status: "success", step: 5, percent: 100 },
+  archived: { label: "Arxivlangan", color: "default", icon: <Archive size={14} />, status: "default", step: 5, percent: 100 },
+  reopened: { label: "Qayta ochilgan", color: "orange", icon: <RotateCcw size={14} />, status: "warning", step: 1, percent: 20 },
+  "send-to-mahalla": { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "success", step: 1, percent: 20 },
 };
 
 const priorityMap = {
+  urgent: { label: "Shoshilinch", color: "error", icon: <AlertCircle size={14} />, gradient: "from-red-500 to-red-600" },
   high: { label: "Yuqori", color: "error", icon: <AlertCircle size={14} />, gradient: "from-red-500 to-red-600" },
   medium: { label: "O‘rta", color: "warning", icon: <Clock size={14} />, gradient: "from-orange-500 to-orange-600" },
   low: { label: "Past", color: "default", icon: <Info size={14} />, gradient: "from-gray-500 to-gray-600" },
@@ -100,7 +113,7 @@ export default function ApplicationDetailPage() {
     },
   });
 
-  const { data: mahalla, isLoading: isMahallaLoading, isError: isMahallaError } = useQuery({
+  const { data: mahalla, isLoading: isMahallaLoading } = useQuery({
     queryKey: ["mahalla", data?.mahalla],
     enabled: !!data?.mahalla,
     queryFn: async () => {
@@ -109,7 +122,7 @@ export default function ApplicationDetailPage() {
     },
   });
 
-  const { data: appTypes = [], isLoading: isAppTypesLoading, isError: isAppTypesError } = useQuery({
+  const { data: appTypes = [] } = useQuery({
     queryKey: ["appTypes"],
     queryFn: async () => {
       const res = await baseURL.get("/v1/application-types/");
@@ -117,7 +130,7 @@ export default function ApplicationDetailPage() {
     },
   });
 
-  const { data: attachments = [], isLoading: isAttachmentsLoading, isError: isAttachmentsError } = useQuery({
+  const { data: attachments = [] } = useQuery({
     queryKey: ["attachments", id],
     queryFn: async () => {
       const res = await baseURL.get(`/v1/applications/${id}/attachments/`);
@@ -125,7 +138,7 @@ export default function ApplicationDetailPage() {
     },
   });
 
-  const { data: timeline = [], isLoading: isTimelineLoading, isError: isTimelineError } = useQuery({
+  const { data: timeline = [] } = useQuery({
     queryKey: ["timeline", id],
     queryFn: async () => {
       const res = await baseURL.get(`/v1/applications/${id}/timeline/`);
@@ -201,9 +214,51 @@ export default function ApplicationDetailPage() {
     return dayjs(date).format("DD.MM.YYYY HH:mm");
   };
 
+  // Get status data based on current status
+  const getCurrentStatusData = () => {
+    return statusMap[data?.status] || { label: data?.status || "Noma'lum", color: "default", icon: <FileText size={14} />, step: 0, percent: 0 };
+  };
+
+  // Get percent based on status
+  const getProgressPercent = () => {
+    const statusData = statusMap[data?.status];
+    if (!statusData) return 0;
+    return statusData.percent;
+  };
+
+  // Get step index for Steps component
+  const getCurrentStep = () => {
+    const statusData = statusMap[data?.status];
+    if (!statusData) return 0;
+    return statusData.step;
+  };
+
+  // Get progress status
+  const getProgressStatus = () => {
+    if (data?.status === "closed") return "success";
+    if (data?.status === "reopened") return "exception";
+    if (data?.status === "archived") return "success";
+    return "active";
+  };
+
+  // Steps items based on correct workflow order:
+  // 1. Yangi (Ariza qabul qilindi)
+  // 2. Mahallaga yuborildi
+  // 3. Qabul qilindi
+  // 4. Ko'rib chiqilmoqda
+  // 5. Tekshirildi
+  // 6. Yopildi
+  const stepsItems = [
+    { title: "Yangi", description: formatDate(data?.created_at) },
+    { title: "Mahallaga yuborildi" },
+    { title: "Qabul qilindi" },
+    { title: "Ko'rib chiqilmoqda" },
+    { title: "Tekshirildi" },
+    { title: "Yopildi" },
+  ];
+
   // ================= UI =================
-  // Loader
-  if(isLoading ){
+  if (isLoading) {
     return (
       <div className="h-[calc(100vh-100px)] flex items-center justify-center">
         <Loader />
@@ -211,8 +266,7 @@ export default function ApplicationDetailPage() {
     );
   }
 
-  // Error
-  if(isError || isMahallaError || isAppTypesError || isAttachmentsError || isTimelineError){
+  if (isError || !data) {
     return (
       <div className="h-[calc(100vh-100px)] flex items-center justify-center">
         <ErrorComponent />
@@ -220,8 +274,11 @@ export default function ApplicationDetailPage() {
     );
   }
 
-  const status = statusMap[data.status] || { label: data.status, color: "default", icon: <FileText size={14} /> };
-  const priority = priorityMap[data.priority] || { label: data.priority, color: "default", icon: <Info size={14} /> };
+  const statusData = getCurrentStatusData();
+  const progressPercent = getProgressPercent();
+  const currentStep = getCurrentStep();
+  const progressStatus = getProgressStatus();
+  const priority = priorityMap[data.priority] || { label: data.priority || "Oddiy", color: "default", icon: <Info size={14} /> };
   const isOverdue = data.deadline && dayjs(data.deadline).isBefore(dayjs());
 
   return (
@@ -245,19 +302,29 @@ export default function ApplicationDetailPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <Title level={4} className="!mb-0">
-                    Ariza #{data.app_number}
+                    Ariza #{data.app_number || data.id}
                   </Title>
                   <Space size="small">
-                    <Badge 
-                      status={status.status || "default"} 
-                      text={status.label}
-                      color={status.color}
-                    />
-                    <Badge 
-                      status="default" 
-                      text={priority.label}
-                      color={priority.color}
-                    />
+                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${
+                      statusData.color === "blue" ? "bg-blue-50 text-blue-700" : 
+                      statusData.color === "orange" ? "bg-orange-50 text-orange-700" : 
+                      statusData.color === "green" ? "bg-green-50 text-green-700" : 
+                      statusData.color === "cyan" ? "bg-cyan-50 text-cyan-700" : 
+                      statusData.color === "purple" ? "bg-purple-50 text-purple-700" : 
+                      statusData.color === "red" ? "bg-red-50 text-red-700" : 
+                      "bg-gray-50 text-gray-700"
+                    }`}>
+                      {statusData.icon}
+                      <span className="text-xs font-medium">{statusData.label}</span>
+                    </div>
+                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${
+                      priority.color === "error" ? "bg-red-50 text-red-700" : 
+                      priority.color === "warning" ? "bg-orange-50 text-orange-700" : 
+                      "bg-gray-50 text-gray-700"
+                    }`}>
+                      {priority.icon}
+                      <span className="text-xs font-medium">{priority.label}</span>
+                    </div>
                   </Space>
                 </div>
                 <Text type="secondary" className="text-sm">
@@ -275,7 +342,7 @@ export default function ApplicationDetailPage() {
                   Tahrirlash
                 </Button>
               </Tooltip>
-              {data.status !== "archive" && (
+              {data.status !== "archive" && data.status !== "archived" && (
                 <Tooltip title="Arxivlash">
                   <Button 
                     icon={<Archive size={16} />} 
@@ -285,7 +352,7 @@ export default function ApplicationDetailPage() {
                   </Button>
                 </Tooltip>
               )}
-              {data.status !== "closed" && data.status !== "archive" && (
+              {data.status !== "closed" && data.status !== "archive" && data.status !== "archived" && (
                 <Tooltip title="Yopish">
                   <Button 
                     danger
@@ -306,7 +373,7 @@ export default function ApplicationDetailPage() {
                   </Button>
                 </Tooltip>
               )}
-              {data.status !== "send-to-mahalla" && data.status !== "closed" && (
+              {data.status !== "send-to-mahalla" && data.status !== "sent_to_mahalla" && data.status !== "closed" && data.status !== "archive" && data.status !== "archived" && (
                 <Tooltip title="Mahallaga yuborish">
                   <Button 
                     type="primary"
@@ -322,7 +389,7 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
-      <div className=" py-8">
+      <div className="py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -403,7 +470,7 @@ export default function ApplicationDetailPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <Text className="font-medium truncate block">
-                            {file.file.split("/").pop()}
+                            {file.file?.split("/").pop() || "Fayl"}
                           </Text>
                           <Text type="secondary" className="text-xs">
                             {formatDate(file.created_at)}
@@ -464,7 +531,7 @@ export default function ApplicationDetailPage() {
                       <div className="pb-2">
                         <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
                           <Text strong className="capitalize">
-                            {item.action.replace(/-/g, " ")}
+                            {item.action?.replace(/-/g, " ") || "Amal"}
                           </Text>
                           <Text type="secondary" className="text-xs">
                             {formatDate(item.created_at)}
@@ -492,7 +559,7 @@ export default function ApplicationDetailPage() {
                 <Title level={5} className="!mb-0">Fuqaro ma'lumotlari</Title>
               </div>
               
-              <Descriptions column={1} size="small" className="space-y-2">
+              <Descriptions column={1} size="small">
                 <Descriptions.Item label={<Space><User size={14} /> Ism</Space>}>
                   <Text strong>{data.citizen_name}</Text>
                 </Descriptions.Item>
@@ -515,29 +582,21 @@ export default function ApplicationDetailPage() {
             <Card className="shadow-sm rounded-xl border-0">
               <div className="flex items-center gap-2 mb-4">
                 <Info size={20} className="text-blue-500" />
-                <Title level={5} className="!mb-0">Holat</Title>
+                <Title level={5} className="!mb-0">Bajarilish holati</Title>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
                   <div className="flex justify-between mb-2">
-                    <Text type="secondary">Bajarilish</Text>
-                    <Text strong>
-                      {data.status === "closed" ? "100%" : 
-                       data.status === "send-to-mahalla" ? "75%" : 
-                       data.status === "reopened" ? "25%" : "0%"}
+                    <Text type="secondary">Bajarilish foizi</Text>
+                    <Text strong className={progressPercent === 100 ? "text-green-600" : ""}>
+                      {progressPercent}%
                     </Text>
                   </div>
                   <Progress 
-                    percent={
-                      data.status === "closed" ? 100 : 
-                      data.status === "send-to-mahalla" ? 75 : 
-                      data.status === "reopened" ? 25 : 0
-                    }
-                    status={
-                      data.status === "closed" ? "success" : 
-                      data.status === "reopened" ? "exception" : "active"
-                    }
+                    percent={progressPercent}
+                    status={progressStatus}
+                    strokeColor={progressPercent === 100 ? "#10b981" : progressStatus === "exception" ? "#ef4444" : "#3b82f6"}
                     showInfo={false}
                   />
                 </div>
@@ -545,17 +604,13 @@ export default function ApplicationDetailPage() {
                 <Steps
                   direction="vertical"
                   size="small"
-                  current={
-                    data.status === "closed" ? 3 :
-                    data.status === "send-to-mahalla" ? 2 :
-                    data.status === "reopened" ? 1 : 0
-                  }
-                  items={[
-                    { title: "Ariza qabul qilindi", description: formatDate(data.created_at) },
-                    { title: "Ko'rib chiqilmoqda" },
-                    { title: "Mahallaga yuborildi" },
-                    { title: "Yopildi" },
-                  ]}
+                  current={currentStep}
+                  status={progressStatus}
+                  items={stepsItems.map((item, idx) => ({
+                    title: item.title,
+                    description: idx === 0 ? item.description : null,
+                    status: idx <= currentStep ? "finish" : "wait",
+                  }))}
                 />
               </div>
             </Card>

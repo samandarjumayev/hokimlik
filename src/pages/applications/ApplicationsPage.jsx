@@ -107,8 +107,8 @@ const statusMap = {
     textColor: "text-red-700",
     borderColor: "border-red-200"
   },
-  archive: { 
-    label: "Arxiv", 
+  archived: { 
+    label: "Arxivlangan", 
     color: "default", 
     icon: <FileTextOutlined />,
     bgColor: "bg-gray-50",

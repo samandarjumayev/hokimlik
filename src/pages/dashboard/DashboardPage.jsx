@@ -27,20 +27,22 @@ import 'dayjs/locale/uz-latn';
 dayjs.extend(relativeTime);
 dayjs.locale('uz-latn');
 
-// Enhanced STATUS MAP
+// Enhanced STATUS MAP - Matches API data
 const statusMap = {
   new: { label: "Yangi", color: "blue", icon: <FileText size={14} />, bgColor: "bg-blue-50", textColor: "text-blue-700" },
-  process: { label: "Jarayonda", color: "orange", icon: <Activity size={14} />, bgColor: "bg-orange-50", textColor: "text-orange-700" },
-  sent: { label: "Yuborilgan", color: "purple", icon: <Send size={14} />, bgColor: "bg-purple-50", textColor: "text-purple-700" },
-  done: { label: "Bajarildi", color: "green", icon: <CheckCircle size={14} />, bgColor: "bg-green-50", textColor: "text-green-700" },
-  rejected: { label: "Rad etildi", color: "red", icon: <AlertTriangle size={14} />, bgColor: "bg-red-50", textColor: "text-red-700" },
-  closed: { label: "Yopilgan", color: "red", icon: <CheckCircle size={14} />, bgColor: "bg-red-50", textColor: "text-red-700" },
-  archived: { label: "Arxiv", color: "gray", icon: <Layers size={14} />, bgColor: "bg-gray-50", textColor: "text-gray-700" },
+  in_review: { label: "Ko'rib chiqilmoqda", color: "orange", icon: <Eye size={14} />, bgColor: "bg-orange-50", textColor: "text-orange-700" },
   sent_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, bgColor: "bg-green-50", textColor: "text-green-700" },
+  acknowledged: { label: "Qabul qilindi", color: "cyan", icon: <CheckCircle size={14} />, bgColor: "bg-cyan-50", textColor: "text-cyan-700" },
+  inspected: { label: "Tekshirildi", color: "purple", icon: <CheckCircle size={14} />, bgColor: "bg-purple-50", textColor: "text-purple-700" },
+  closed: { label: "Yopilgan", color: "red", icon: <CheckCircle size={14} />, bgColor: "bg-red-50", textColor: "text-red-700" },
+  archived: { label: "Arxivlangan", color: "gray", icon: <Layers size={14} />, bgColor: "bg-gray-50", textColor: "text-gray-700" },
+  reopened: { label: "Qayta ochilgan", color: "orange", icon: <Activity size={14} />, bgColor: "bg-orange-50", textColor: "text-orange-700" },
+  send_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, bgColor: "bg-green-50", textColor: "text-green-700" },
 };
 
-// PRIORITY MAP
+// PRIORITY MAP - Matches API data
 const priorityMap = {
+  urgent: { label: "Shoshilinch", color: "red", icon: <AlertTriangle size={12} /> },
   high: { label: "Yuqori", color: "red", icon: <AlertTriangle size={12} /> },
   medium: { label: "O‘rta", color: "orange", icon: <Clock size={12} /> },
   low: { label: "Past", color: "default", icon: <CheckCircle size={12} /> },
@@ -72,7 +74,7 @@ const DashboardPage = () => {
     queryKey: ["applications"],
     queryFn: async () => {
       const res = await baseURL.get("/v1/applications/");
-      return res.data.results;
+      return res.data.results || [];
     },
   });
 
@@ -176,7 +178,7 @@ const DashboardPage = () => {
     { label: "Boshqa", value: 42, color: "#ef4444" },
   ];
 
-  // Table columns
+  // Table columns - Fixed status and priority render
   const columns = [
     {
       title: "#",
@@ -209,7 +211,7 @@ const DashboardPage = () => {
       title: "Holat",
       dataIndex: "status",
       render: (s) => {
-        const st = statusMap[s] || { label: s, color: "default", bgColor: "bg-gray-50", textColor: "text-gray-700" };
+        const st = statusMap[s] || { label: s || "Noma'lum", color: "default", icon: <FileText size={14} />, bgColor: "bg-gray-50", textColor: "text-gray-700" };
         return (
           <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${st.bgColor} ${st.textColor}`}>
             {st.icon}
@@ -222,14 +224,17 @@ const DashboardPage = () => {
       title: "Muhimlik",
       dataIndex: "priority",
       render: (p) => {
-        const pr = priorityMap[p] || { label: p, color: "default", icon: <CheckCircle size={12} /> };
+        const pr = priorityMap[p] || { label: p || "Oddiy", color: "default", icon: <CheckCircle size={12} /> };
+        const getBgColor = () => {
+          if (pr.color === "red") return "bg-red-50 text-red-700";
+          if (pr.color === "orange") return "bg-orange-50 text-orange-700";
+          return "bg-gray-50 text-gray-700";
+        };
         return (
-          <>
-            <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${pr.color === 'red' ? 'bg-red-50 text-red-700' : pr.color === 'orange' ? 'bg-orange-50 text-orange-700' : 'bg-gray-50 text-gray-700'}`}>
-              {pr.icon}
-              <span className="text-xs font-medium">{pr.label}</span>
-            </div>
-          </>
+          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${getBgColor()}`}>
+            {pr.icon}
+            <span className="text-xs font-medium">{pr.label}</span>
+          </div>
         );
       },
     },
@@ -264,68 +269,38 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        
-
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Service Types Chart */}
-          {/* <Card 
-            title={
-              <div className="flex items-center gap-2">
-                <BarChart3 size={18} className="text-blue-500" />
-                <span className="font-medium">Xizmat turlari bo'yicha</span>
-              </div>
-            }
-            className="border-0 shadow-sm rounded-xl"
-          >
-            <div className="space-y-4">
-              {serviceTypes.map((item, idx) => (
-                <div key={idx}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-600">{item.label}</span>
-                    <span className="font-semibold text-gray-800">{item.value}</span>
-                  </div>
-                  <Progress 
-                    percent={item.value} 
-                    strokeColor={item.color}
-                    showInfo={false}
-                    size="small"
-                  />
-                </div>
-              ))}
-            </div>
-          </Card> */}
-
           {/* Stats Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {stats.map((stat, i) => {
-            const Icon = stat.icon;
-            return (
-              <Card 
-                key={i} 
-                className="border-0 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden"
-                bodyStyle={{ padding: "16px" }}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
-                    <Icon className={stat.iconColor} size={20} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {stats.map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <Card 
+                  key={i} 
+                  className="border-0 shadow-sm hover:shadow-md transition-all duration-300 rounded-xl overflow-hidden"
+                  bodyStyle={{ padding: "16px" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
+                      <Icon className={stat.iconColor} size={20} />
+                    </div>
+                    <Badge 
+                      count={stat.trend} 
+                      style={{ backgroundColor: stat.trend.startsWith('+') ? '#10b981' : '#ef4444' }}
+                      className="text-xs"
+                    />
                   </div>
-                  <Badge 
-                    count={stat.trend} 
-                    style={{ backgroundColor: stat.trend.startsWith('+') ? '#10b981' : '#ef4444' }}
-                    className="text-xs"
-                  />
-                </div>
-                <div className="text-2xl font-bold text-gray-800">
-                  {stat.value}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {stat.title}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                  <div className="text-2xl font-bold text-gray-800">
+                    {stat.value}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {stat.title}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
 
           {/* Status Distribution */}
           <Card 
@@ -343,11 +318,20 @@ const DashboardPage = () => {
               <div className="space-y-3">
                 {chartData.map((item, idx) => {
                   const percent = (item.count / (summary?.jami_murojaatlar || 1)) * 100;
+                  const getColor = () => {
+                    if (item.color === "blue") return "#3b82f6";
+                    if (item.color === "orange") return "#f59e0b";
+                    if (item.color === "green") return "#10b981";
+                    if (item.color === "cyan") return "#06b6d4";
+                    if (item.color === "purple") return "#8b5cf6";
+                    if (item.color === "red") return "#ef4444";
+                    return "#6b7280";
+                  };
                   return (
                     <div key={idx}>
                       <div className="flex justify-between items-center mb-1">
                         <div className="flex items-center gap-2">
-                          <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: `var(--${item.color}-500)` }} />
+                          <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: getColor() }} />
                           <span className="text-sm text-gray-600">{item.status}</span>
                         </div>
                         <span className="text-sm font-semibold text-gray-800">{item.count}</span>
@@ -355,7 +339,7 @@ const DashboardPage = () => {
                       <Progress 
                         percent={percent} 
                         showInfo={false}
-                        strokeColor={`var(--${item.color}-500)`}
+                        strokeColor={getColor()}
                         size="small"
                       />
                     </div>
@@ -405,8 +389,6 @@ const DashboardPage = () => {
             />
           )}
         </Card>
-
-        
       </div>
 
       <style jsx>{`
