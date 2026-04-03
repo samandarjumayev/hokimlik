@@ -9,7 +9,7 @@ export default function App(){
     <div className="relative flex-1 overflow-y-auto overflow-x-hidden flex flex-col h-full">
       <Header />
       
-      <div className="px-5 pt-5 flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <Outlet />
       </div>
     </div>

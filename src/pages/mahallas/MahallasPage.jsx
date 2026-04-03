@@ -308,7 +308,7 @@ const MahallasPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="p-5 min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {ctx}
 
       {/* Header Section */}

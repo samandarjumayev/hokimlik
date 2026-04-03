@@ -131,7 +131,7 @@ const Settings = () => {
   }
 
   return (
-    <div>
+    <div className="p-5 min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {contextHolder}
 
       {/* 🔷 PROFILE PREVIEW */}
