@@ -19,7 +19,7 @@ import { baseURL } from "../../auth/api/api";
 import Loader from "../../components/ui/Loader";
 import ErrorComponent from "../../components/ui/ErrorComponent";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import 'dayjs/locale/uz-latn';
@@ -74,9 +74,21 @@ const DashboardPage = () => {
     queryKey: ["applications"],
     queryFn: async () => {
       const res = await baseURL.get("/v1/applications/");
+      console.log("Applications API response:", res.data);
       return res.data.results || [];
     },
   });
+
+  // Calculate delayed applications (kechikkan) based on deadline
+  const delayedCount = useMemo(() => {
+    const today = dayjs().startOf('day');
+    return applications.filter(app => {
+      if (!app.deadline) return false;
+      const deadline = dayjs(app.deadline);
+      // Check if deadline is in the past and application is not closed
+      return deadline.isBefore(today) && app.status !== "closed";
+    }).length;
+  }, [applications]);
 
   // Loader
   if(isLoadingSummary || isLoadingApplications){
@@ -103,7 +115,7 @@ const DashboardPage = () => {
   const stats = [
     {
       title: "Jami hisobotlar",
-      value: summary?.jami_hisobotlar || 0,
+      value: summary?.jami_murojaatlar || 0,
       icon: Layers,
       color: "from-blue-500 to-blue-600",
       bgColor: "bg-blue-50",
@@ -139,7 +151,7 @@ const DashboardPage = () => {
     },
     {
       title: "Kechikkanlar",
-      value: summary?.kechikkan_hisobotlar || 0,
+      value: delayedCount,
       icon: Clock,
       color: "from-orange-500 to-orange-600",
       bgColor: "bg-orange-50",
@@ -148,7 +160,7 @@ const DashboardPage = () => {
     },
     {
       title: "Bugungi",
-      value: summary?.bugungi_hisobotlar || 0,
+      value: summary?.bugungi_murojaatlar || 0,
       icon: Calendar,
       color: "from-teal-500 to-teal-600",
       bgColor: "bg-teal-50",
@@ -168,15 +180,6 @@ const DashboardPage = () => {
     count: item.count,
     color: statusMap[item.status]?.color || "gray",
   }));
-
-  // Service types data (mock - replace with actual API if available)
-  const serviceTypes = [
-    { label: "Nikoh ro'yxati", value: 35, color: "#3b82f6" },
-    { label: "Yer ajratish", value: 45, color: "#10b981" },
-    { label: "Ijtimoiy yordam", value: 20, color: "#f59e0b" },
-    { label: "Kommunal xizmat", value: 28, color: "#8b5cf6" },
-    { label: "Boshqa", value: 42, color: "#ef4444" },
-  ];
 
   // Table columns - Fixed status and priority render
   const columns = [
@@ -317,7 +320,7 @@ const DashboardPage = () => {
             ) : (
               <div className="space-y-3">
                 {chartData.map((item, idx) => {
-                  const percent = (item.count / (summary?.jami_hisobotlar || 1)) * 100;
+                  const percent = (item.count / (summary?.jami_murojaatlar || 1)) * 100;
                   const getColor = () => {
                     if (item.color === "blue") return "#3b82f6";
                     if (item.color === "orange") return "#f59e0b";

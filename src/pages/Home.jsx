@@ -64,7 +64,7 @@ export default function Home() {
             {/* TOP BAR */}
             <div className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white text-sm">
                 <div className="max-w-7xl mx-auto px-6 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 cursor-context-menu">
                         <Shield size={16} />
                         <span>Davlat xizmatlari monitoring tizimi</span>
                         <span className="hidden md:inline text-blue-200">|</span>
@@ -73,7 +73,7 @@ export default function Home() {
                     <div className="flex gap-4">
                         <button
                             onClick={() => navigate("/login")}
-                            className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-lg py-1.5 px-3 transition-all duration-200 cursor-pointer"
+                            className="flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-lg py-1.5 px-3 transition-all duration-200 cursor-pointer active:duration-75 active:scale-95"
                         >
                             <LogIn size={16} />
                             <span className="font-medium">Kirish</span>
@@ -85,7 +85,7 @@ export default function Home() {
             {/* NAVBAR */}
             <div className="bg-white shadow-sm sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 cursor-context-menu">
                         <Building2 className="text-blue-600" size={28} />
                         <div>
                             <div className="text-xl font-bold text-gray-800">Hokimlik Monitoring Tizimi</div>
@@ -93,11 +93,11 @@ export default function Home() {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <button className="flex items-center gap-2 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 py-2 px-4 rounded-full transition-all duration-200 text-gray-600 hover:text-blue-600">
+                        <button className="flex items-center gap-2 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 py-2 px-4 rounded-full transition-all duration-200 text-gray-600 hover:text-blue-600 cursor-pointer">
                             <Phone size={16} />
                             <span>1272</span>
                         </button>
-                        <button className="flex items-center gap-2 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 py-2 px-4 rounded-full transition-all duration-200 text-gray-600 hover:text-blue-600">
+                        <button className="flex items-center gap-2 border border-gray-200 hover:border-blue-300 hover:bg-blue-50 py-2 px-4 rounded-full transition-all duration-200 text-gray-600 hover:text-blue-600 cursor-pointer">
                             <Mail size={16} />
                             <span>Yordam</span>
                         </button>

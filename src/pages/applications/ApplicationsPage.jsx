@@ -522,7 +522,7 @@ const ApplicationsPage = () => {
         </div>
       </div>
 
-      <div className="px-5 py-8">
+      <div className="py-8">
         {/* Statistics Cards */}
         <Row gutter={[16, 16]} className="mb-6">
           <Col xs={24} sm={12} lg={6}>
