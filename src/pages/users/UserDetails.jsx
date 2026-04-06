@@ -43,6 +43,7 @@ import {
 } from "@ant-design/icons";
 import Loader from "../../components/ui/Loader";
 import ErrorComponent from "../../components/ui/ErrorComponent";
+import { useSelector } from "react-redux";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -70,7 +71,7 @@ const roleMap = {
     borderColor: "border-yellow-200",
     gradient: "from-yellow-500 to-yellow-600"
   },
-  xodim: { 
+  service_staff: { 
     label: "Xodim", 
     color: "blue", 
     icon: <UserOutlined />,
@@ -94,6 +95,7 @@ export default function UserDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { role: currentUserRole } = useSelector((state) => state.backend);
 
   const [modal, setModal] = useState(false);
   const [form] = Form.useForm();
@@ -112,6 +114,11 @@ export default function UserDetails() {
     enabled: !!id,
   });
 
+  // Check if editing user is super_admin
+  const isEditingSuperAdmin = user?.role === "super_admin";
+  // Check if can delete (super_admin cannot be deleted)
+  const canDelete = user?.role !== "super_admin";
+
   // GET MAHALLAS
   const { data: mahallas = [] } = useQuery({
     queryKey: ["mahallas"],
@@ -121,35 +128,36 @@ export default function UserDetails() {
     },
   });
 
-  // GET SERVICES
+  // GET SERVICES - ONLY ACTIVE SERVICES
   const { data: services = [], isLoading: isServicesLoading, isError: isServicesError } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       const res = await baseURL.get("/v1/services/");
-      return res.data.results || [];
+      const allServices = res.data.results || [];
+      return allServices.filter(service => service.is_active === true);
     },
   });
 
   // GET MAHALLA DETAIL if user is oqsoqol
   const { data: mahallaDetail } = useQuery({
-    queryKey: ["mahalla", user?.mahalla_id],
+    queryKey: ["mahalla", user?.mahalla],
     queryFn: async () => {
-      if (!user?.mahalla_id) return null;
-      const res = await baseURL.get(`/v1/mahallas/${user.mahalla_id}/`);
+      if (!user?.mahalla) return null;
+      const res = await baseURL.get(`/v1/mahallas/${user.mahalla}/`);
       return res.data;
     },
-    enabled: !!user?.mahalla_id && user?.role === "oqsoqol",
+    enabled: !!user?.mahalla && user?.role === "oqsoqol",
   });
 
-  // GET SERVICE DETAIL if user is xodim
+  // GET SERVICE DETAIL if user is service_staff
   const { data: serviceDetail } = useQuery({
-    queryKey: ["service", user?.service_id],
+    queryKey: ["service", user?.service],
     queryFn: async () => {
-      if (!user?.service_id) return null;
-      const res = await baseURL.get(`/v1/services/${user.service_id}/`);
+      if (!user?.service) return null;
+      const res = await baseURL.get(`/v1/services/${user.service}/`);
       return res.data;
     },
-    enabled: !!user?.service_id && user?.role === "xodim",
+    enabled: !!user?.service && user?.role === "service_staff",
   });
 
   useEffect(() => {
@@ -157,7 +165,7 @@ export default function UserDetails() {
       setSelectedRole(user.role);
       if (user.role === "oqsoqol" && mahallaDetail) {
         setAdditionalData({ name: mahallaDetail.name, district: mahallaDetail.district });
-      } else if (user.role === "xodim" && serviceDetail) {
+      } else if (user.role === "service_staff" && serviceDetail) {
         setAdditionalData({ name: serviceDetail.name });
       } else {
         setAdditionalData(null);
@@ -228,9 +236,9 @@ export default function UserDetails() {
       username: user.username,
       phone: user.phone,
       role: user.role,
-      mahalla_id: user.mahalla_id || null,
-      service_id: user.service_id || null,
-      password: "", // Empty password field for editing
+      mahalla_id: user.mahalla || null,
+      service_id: user.service || null,
+      password: "",
     });
     setSelectedRole(user.role);
     setModal(true);
@@ -246,17 +254,15 @@ export default function UserDetails() {
         role: values.role,
       };
       
-      // Add password if provided
       if (values.password && values.password.trim()) {
         payload.password = values.password;
       }
       
-      // Add conditional fields based on role
       if (values.role === "oqsoqol" && values.mahalla_id) {
-        payload.mahalla_id = values.mahalla_id;
+        payload.mahalla = values.mahalla_id;
       }
-      if (values.role === "xodim" && values.service_id) {
-        payload.service_id = values.service_id;
+      if (values.role === "service_staff" && values.service_id) {
+        payload.service = values.service_id;
       }
       
       updateMutation.mutate(payload);
@@ -284,14 +290,14 @@ export default function UserDetails() {
       {contextHolder}
 
       {/* Header Section */}
-      <div className="bg-white border-b border-gray-200 shadow-sm z-10">
+      <div className="bg-white border-b border-gray-200 shadow-sm z-10 pr-5">
         <div className="py-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <Button
               type="text"
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate(-1)}
-              className="hover:bg-gray-100"
+              className=""
               size="large"
             >
               Orqaga
@@ -310,40 +316,43 @@ export default function UserDetails() {
                 </Button>
               </Tooltip>
 
-              <Tooltip title="O'chirish">
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  size="large"
-                  onClick={() =>
-                    Modal.confirm({
-                      title: "Foydalanuvchini o'chirish",
-                      content: (
-                        <div>
-                          <Paragraph>
-                            <Text strong>{user.full_name}</Text> foydalanuvchisini o'chirmoqchimisiz?
-                          </Paragraph>
-                          <Alert
-                            message="Diqqat!"
-                            description="Bu amalni qaytarib bo'lmaydi. Foydalanuvchi va unga tegishli barcha ma'lumotlar butunlay o'chiriladi."
-                            type="warning"
-                            showIcon
-                            className="mt-3"
-                          />
-                        </div>
-                      ),
-                      okText: "Ha, o'chirish",
-                      cancelText: "Bekor qilish",
-                      okButtonProps: { danger: true, size: "large" },
-                      cancelButtonProps: { size: "large" },
-                      width: 500,
-                      onOk: () => deleteMutation.mutate(),
-                    })
-                  }
-                >
-                  O'chirish
-                </Button>
-              </Tooltip>
+              {/* Delete button - only show if user is not super_admin */}
+              {canDelete && (
+                <Tooltip title="O'chirish">
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    size="large"
+                    onClick={() =>
+                      Modal.confirm({
+                        title: "Foydalanuvchini o'chirish",
+                        content: (
+                          <div>
+                            <Paragraph>
+                              <Text strong>{user.full_name}</Text> foydalanuvchisini o'chirmoqchimisiz?
+                            </Paragraph>
+                            <Alert
+                              message="Diqqat!"
+                              description="Bu amalni qaytarib bo'lmaydi. Foydalanuvchi va unga tegishli barcha ma'lumotlar butunlay o'chiriladi."
+                              type="warning"
+                              showIcon
+                              className="mt-3"
+                            />
+                          </div>
+                        ),
+                        okText: "Ha, o'chirish",
+                        cancelText: "Bekor qilish",
+                        okButtonProps: { danger: true, size: "large" },
+                        cancelButtonProps: { size: "large" },
+                        width: 500,
+                        onOk: () => deleteMutation.mutate(),
+                      })
+                    }
+                  >
+                    O'chirish
+                  </Button>
+                </Tooltip>
+              )}
             </Space>
           </div>
         </div>
@@ -462,8 +471,8 @@ export default function UserDetails() {
                   </>
                 )}
                 
-                {/* Conditional fields for Xodim */}
-                {user.role === "xodim" && additionalData && (
+                {/* Conditional fields for Service Staff */}
+                {user.role === "service_staff" && additionalData && (
                   <Descriptions.Item label="Xizmat turi">
                     <Space>
                       <BuildOutlined className="text-blue-500" />
@@ -571,7 +580,6 @@ export default function UserDetails() {
         className="rounded-xl"
       >
         <Form form={form} layout="vertical" className="mt-4">
-          {/* First Row - First Name and Last Name */}
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item 
@@ -601,7 +609,6 @@ export default function UserDetails() {
             </Col>
           </Row>
 
-          {/* Second Row - Username and Phone */}
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item 
@@ -630,7 +637,6 @@ export default function UserDetails() {
             </Col>
           </Row>
 
-          {/* Third Row - Password (full width) */}
           <Form.Item 
             name="password" 
             label="Password"
@@ -643,59 +649,52 @@ export default function UserDetails() {
             />
           </Form.Item>
 
-          {/* Fourth Row - Role */}
-          <Form.Item 
-            name="role" 
-            label="Rol" 
-            rules={[{ required: true, message: "Rolni tanlang" }]}
-          >
-            <Select
-              placeholder="Rolni tanlang"
-              size="large"
-              onChange={(value) => {
-                setSelectedRole(value);
-                form.setFieldsValue({ mahalla_id: null, service_id: null });
-              }}
-              options={[
-                { 
-                  value: "super_admin", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-red-500" />
-                      <span>Super Admin</span>
-                    </Space>
-                  )
-                },
-                { 
-                  value: "hokim", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-yellow-500" />
-                      <span>Hokim</span>
-                    </Space>
-                  )
-                },
-                { 
-                  value: "xodim", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-blue-500" />
-                      <span>Xodim</span>
-                    </Space>
-                  )
-                },
-                { 
-                  value: "oqsoqol", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-green-500" />
-                      <span>Oqsoqol</span>
-                    </Space>
-                  )
-                },
-              ]}
-            />
-          </Form.Item>
+          {/* Role field - only show if not editing super_admin */}
+          {!isEditingSuperAdmin && (
+            <Form.Item 
+              name="role" 
+              label="Rol" 
+              rules={[{ required: true, message: "Rolni tanlang" }]}
+            >
+              <Select
+                placeholder="Rolni tanlang"
+                size="large"
+                onChange={(value) => {
+                  setSelectedRole(value);
+                  form.setFieldsValue({ mahalla_id: null, service_id: null });
+                }}
+                options={[
+                  { 
+                    value: "hokim", 
+                    label: (
+                      <Space>
+                        <UserOutlined className="text-yellow-500" />
+                        <span>Hokim</span>
+                      </Space>
+                    )
+                  },
+                  { 
+                    value: "service_staff", 
+                    label: (
+                      <Space>
+                        <UserOutlined className="text-blue-500" />
+                        <span>Xodim</span>
+                      </Space>
+                    )
+                  },
+                  { 
+                    value: "oqsoqol", 
+                    label: (
+                      <Space>
+                        <UserOutlined className="text-green-500" />
+                        <span>Oqsoqol</span>
+                      </Space>
+                    )
+                  },
+                ]}
+              />
+            </Form.Item>
+          )}
 
           {/* Conditional field for Oqsoqol - Mahalla */}
           {selectedRole === "oqsoqol" && (
@@ -708,6 +707,8 @@ export default function UserDetails() {
                 showSearch
                 placeholder="Mahallani tanlang"
                 size="large"
+                defaultValue={user?.mahalla}
+                value={form.getFieldValue('mahalla_id') || user?.mahalla}
                 options={mahallas.map((m) => ({
                   value: m.id,
                   label: `${m.name} (${m.district})`,
@@ -719,8 +720,8 @@ export default function UserDetails() {
             </Form.Item>
           )}
 
-          {/* Conditional field for Xodim - Service */}
-          {selectedRole === "xodim" && (
+          {/* Conditional field for Service Staff - Service */}
+          {selectedRole === "service_staff" && (
             <Form.Item 
               name="service_id" 
               label="Xizmat turi" 
@@ -730,6 +731,8 @@ export default function UserDetails() {
                 showSearch
                 placeholder="Xizmat turini tanlang"
                 size="large"
+                defaultValue={user?.service}
+                value={form.getFieldValue('service_id') || user?.service}
                 options={services.map((s) => ({
                   value: s.id,
                   label: s.name,
@@ -740,14 +743,6 @@ export default function UserDetails() {
               />
             </Form.Item>
           )}
-
-          <Alert
-            message="Ma'lumot"
-            description="Foydalanuvchi parolini o'zgartirish uchun yuqoridagi password maydoniga yangi parolni kiriting."
-            type="info"
-            showIcon
-            className="mt-4"
-          />
         </Form>
       </Modal>
 

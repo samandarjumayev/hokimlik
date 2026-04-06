@@ -24,6 +24,7 @@ export default function Login() {
             setErrorMessage('');
             try {
                 let resp = await baseURL.post('/v1/auth/login/', values);
+                console.log(resp.data);
                 if (resp.data.role === 'oqsoqol') {
                     setErrorMessage('Oqsoqol roli uchun kirish huquqi cheklangan');
                     setTimeout(() => navigate('/'), 1500);
@@ -34,9 +35,13 @@ export default function Login() {
                         user: values.username,
                         role: resp.data.role === 'xodim' ? 'service_staff' : resp.data.role,
                         id: resp.data.id,
-                        service_id: resp.data.service || null
+                        service: resp.data.service,
                     }));
-                    navigate('/dashboard');
+                    if(resp.data.role === 'service_staff'){
+                        navigate('/dashboard/applications');
+                    }else{
+                        navigate('/dashboard');
+                    }
                 }
             } catch (xatolik) {
                 setErrorMessage('Login yoki parol noto\'g\'ri. Iltimos qaytadan urinib ko\'ring.');

@@ -39,11 +39,15 @@ export default function Home() {
                         user: values.username,
                         role: resp.data.role,
                         id: resp.data.id,
-                        service_id: resp.data.service || null
+                        service: resp.data.service,
                     })
                 );
                 messageApi.success("Muvaffaqiyatli kirildi ✅");
-                navigate("/dashboard");
+                if(resp.data.role === "service_staff") {
+                    navigate("/dashboard/applications");
+                } else {
+                    navigate("/dashboard");
+                }
             } catch (err) {
                 messageApi.error("Login yoki parol noto‘g‘ri ❌");
             }

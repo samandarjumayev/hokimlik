@@ -9,7 +9,7 @@ const initialState = {
     user: JSON.parse(localStorage.getItem('user')) || null,
     role: localStorage.getItem('role') || null,
     id: localStorage.getItem('id') || null,
-    service_id: localStorage.getItem('service_id') || null,
+    service: localStorage.getItem('service') || null,
     // role: "super_admin",
 }
 
@@ -24,7 +24,7 @@ const userSlice = createSlice({
             state.menu = !state.menu
         },
         login: (state, action) => {
-            const { access, refresh, user, role, id, service_id } = action.payload;
+            const { access, refresh, user, role, id, service } = action.payload;
             state.isAuth = true;
             state.access = access;
             state.refresh = refresh;
@@ -37,7 +37,7 @@ const userSlice = createSlice({
             localStorage.setItem('user', JSON.stringify(user));
             localStorage.setItem('role', role);
             localStorage.setItem('id', id);
-            localStorage.setItem('service_id', service_id);
+            localStorage.setItem('service', service);
         },
         logout: (state) => {
             state.isAuth = false;
@@ -46,13 +46,14 @@ const userSlice = createSlice({
             state.user = null;
             state.role = null;
             state.id = null;
+            state.service = null;
 
             localStorage.removeItem('access');
             localStorage.removeItem('refresh');
             localStorage.removeItem('user');
             localStorage.removeItem('role');
             localStorage.removeItem('id');
-            localStorage.removeItem('service_id');
+            localStorage.removeItem('service');
         } 
     }
 })

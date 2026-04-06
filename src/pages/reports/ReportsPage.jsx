@@ -272,7 +272,7 @@ const ReportsPage = () => {
               <div className="flex items-center gap-2 mb-1">
                 <FileTextOutlined className="text-blue-500 text-xl" />
                 <Title level={3} className="!mb-0">
-                  Mahalla hisobotlari
+                  Mahalla hisobotlari ({total})
                 </Title>
               </div>
               <Text type="secondary">

@@ -321,7 +321,7 @@ const ApplicationsPage = () => {
         status: "new",
       };
 
-      const servisIDTemp = localStorage.getItem('service_id');
+      const servisIDTemp = localStorage.getItem('service');
       console.log("aaa",servisIDTemp, role)
       
       if (role === "service_staff" && servisIDTemp) {

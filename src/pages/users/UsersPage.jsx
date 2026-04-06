@@ -37,6 +37,7 @@ import { baseURL } from "../../auth/api/api";
 import Loader from "../../components/ui/Loader";
 import ErrorComponent from "../../components/ui/ErrorComponent";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
@@ -89,6 +90,7 @@ const UsersPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState(null);
+  const { role: currentUserRole } = useSelector((state) => state.backend);
 
   // PAGINATION STATE
   const [page, setPage] = useState(1);
@@ -146,7 +148,7 @@ const UsersPage = () => {
           u.username?.toLowerCase().includes(search.toLowerCase())
       );
       setFilteredUsers(filtered);
-      setPage(1); // Reset to first page when search changes
+      setPage(1);
     }
   }, [search, allUsers]);
 
@@ -294,6 +296,12 @@ const UsersPage = () => {
     });
   };
 
+  // Check if editing user is super_admin
+  const isEditingSuperAdmin = editingUser?.role === "super_admin";
+  
+  // Check if user can be deleted (super_admin cannot be deleted)
+  const canDeleteUser = (userRole) => userRole !== "super_admin";
+
   // Enhanced Columns
   const columns = [
     {
@@ -373,25 +381,28 @@ const UsersPage = () => {
               className="hover:bg-blue-50"
             />
           </Tooltip>
-          <Tooltip title="O'chirish">
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              size="small"
-              danger
-              onClick={() =>
-                Modal.confirm({
-                  title: "Foydalanuvchini o'chirish",
-                  content: `${record.full_name} foydalanuvchisini o'chirmoqchimisiz?`,
-                  okText: "Ha, o'chirish",
-                  cancelText: "Bekor qilish",
-                  okButtonProps: { danger: true },
-                  onOk: () => deleteMutation.mutate(record.id),
-                })
-              }
-              className="hover:bg-red-50"
-            />
-          </Tooltip>
+          {/* Delete button - only show if user is not super_admin */}
+          {canDeleteUser(record.role) && (
+            <Tooltip title="O'chirish">
+              <Button
+                type="text"
+                icon={<DeleteOutlined />}
+                size="small"
+                danger
+                onClick={() =>
+                  Modal.confirm({
+                    title: "Foydalanuvchini o'chirish",
+                    content: `${record.full_name} foydalanuvchisini o'chirmoqchimisiz?`,
+                    okText: "Ha, o'chirish",
+                    cancelText: "Bekor qilish",
+                    okButtonProps: { danger: true },
+                    onOk: () => deleteMutation.mutate(record.id),
+                  })
+                }
+                className="hover:bg-red-50"
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -656,57 +667,51 @@ const UsersPage = () => {
             />
           </Form.Item>
 
-          <Form.Item 
-            name="role" 
-            label="Rol" 
-            rules={[{ required: true, message: "Rolni tanlang" }]}
-          >
-            <Select
-              placeholder="Rolni tanlang"
-              onChange={(value) => {
-                setSelectedRole(value);
-                form.setFieldsValue({ mahalla: null, service: null });
-              }}
-              options={[
-                { 
-                  value: "super_admin", 
-                  label: (
-                    <Space>
-                      <TeamOutlined className="text-red-500" />
-                      <span>Super Admin</span>
-                    </Space>
-                  )
-                },
-                { 
-                  value: "hokim", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-blue-500" />
-                      <span>Hokim</span>
-                    </Space>
-                  )
-                },
-                { 
-                  value: "service_staff", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-green-500" />
-                      <span>Xodim</span>
-                    </Space>
-                  )
-                },
-                { 
-                  value: "oqsoqol", 
-                  label: (
-                    <Space>
-                      <UserOutlined className="text-purple-500" />
-                      <span>Oqsoqol</span>
-                    </Space>
-                  )
-                },
-              ]}
-            />
-          </Form.Item>
+          {/* Role field - only show if not editing super_admin */}
+          {!isEditingSuperAdmin && (
+            <Form.Item 
+              name="role" 
+              label="Rol" 
+              rules={[{ required: true, message: "Rolni tanlang" }]}
+            >
+              <Select
+                placeholder="Rolni tanlang"
+                onChange={(value) => {
+                  setSelectedRole(value);
+                  form.setFieldsValue({ mahalla: null, service: null });
+                }}
+                options={[
+                  { 
+                    value: "hokim", 
+                    label: (
+                      <Space>
+                        <UserOutlined className="text-blue-500" />
+                        <span>Hokim</span>
+                      </Space>
+                    )
+                  },
+                  { 
+                    value: "service_staff", 
+                    label: (
+                      <Space>
+                        <UserOutlined className="text-green-500" />
+                        <span>Xodim</span>
+                      </Space>
+                    )
+                  },
+                  { 
+                    value: "oqsoqol", 
+                    label: (
+                      <Space>
+                        <UserOutlined className="text-purple-500" />
+                        <span>Oqsoqol</span>
+                      </Space>
+                    )
+                  },
+                ]}
+              />
+            </Form.Item>
+          )}
 
           {/* Conditional field for Oqsoqol - Mahalla */}
           {selectedRole === "oqsoqol" && (

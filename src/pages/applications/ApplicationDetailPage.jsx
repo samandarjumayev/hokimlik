@@ -60,6 +60,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
 import Loader from "../../components/ui/Loader";
 import ErrorComponent from "../../components/ui/ErrorComponent";
+import { useSelector } from "react-redux";
 
 dayjs.extend(relativeTime);
 dayjs.extend(utc);
@@ -67,13 +68,6 @@ dayjs.extend(utc);
 const { Title, Text, Paragraph } = Typography;
 
 // Status Map - Correct workflow order
-// Workflow: 
-// 1. new (Yangi) - step 0, percent 0
-// 2. sent_to_mahalla (Mahallaga yuborilgan) - step 1, percent 20
-// 3. acknowledged (Qabul qilindi) - step 2, percent 40
-// 4. in_review (Ko'rib chiqilmoqda) - step 3, percent 60
-// 5. inspected (Tekshirildi) - step 4, percent 80
-// 6. closed (Yopilgan) - step 5, percent 100
 const statusMap = {
   new: { label: "Yangi", color: "blue", icon: <FileText size={14} />, status: "processing", step: 0, percent: 0 },
   sent_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "active", step: 1, percent: 20 },
@@ -97,12 +91,22 @@ export default function ApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { role } = useSelector((state) => state.backend);
 
   const [messageApi, contextHolder] = message.useMessage();
   const [editOpen, setEditOpen] = useState(false);
   const [form] = Form.useForm();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
+
+  // Check permissions based on role
+  const canEdit = role === "super_admin";
+  const canUpload = role === "super_admin" || role === "hokim";
+  const canViewTimeline = role === "super_admin" || role === "hokim";
+  const canArchive = role === "super_admin" || role === "hokim";
+  const canClose = role === "super_admin" || role === "hokim";
+  const canReopen = role === "super_admin" || role === "hokim";
+  const canSendToMahalla = role === "super_admin" || role === "hokim";
 
   // ================= FETCH =================
   const { data, isLoading, isError } = useQuery({
@@ -113,12 +117,14 @@ export default function ApplicationDetailPage() {
     },
   });
 
-  const { data: mahalla, isLoading: isMahallaLoading } = useQuery({
+  const { data: mahalla, isLoading: isMahallaLoading, isError: isMahallaError } = useQuery({
     queryKey: ["mahalla", data?.mahalla],
     enabled: !!data?.mahalla,
     queryFn: async () => {
-      const res = await baseURL.get(`/v1/mahallas/${data.mahalla}/`);
-      return res.data;
+      if(role !== "service_staff"){
+        const res = await baseURL.get(`/v1/mahallas/${data.mahalla}/`);
+        return res.data;
+      }
     },
   });
 
@@ -134,8 +140,10 @@ export default function ApplicationDetailPage() {
     queryKey: ["attachments", id],
     queryFn: async () => {
       const res = await baseURL.get(`/v1/applications/${id}/attachments/`);
-      return res.data.results || res.data;
+      console.log("Attachments response:", res.data);
+      return res.data;
     },
+    enabled: canViewTimeline, // Only fetch if user has permission
   });
 
   const { data: timeline = [] } = useQuery({
@@ -144,6 +152,7 @@ export default function ApplicationDetailPage() {
       const res = await baseURL.get(`/v1/applications/${id}/timeline/`);
       return res.data;
     },
+    enabled: canViewTimeline, // Only fetch if user has permission
   });
 
   // ================= MUTATIONS =================
@@ -171,7 +180,8 @@ export default function ApplicationDetailPage() {
       };
       messageApi.success(actionMessages[action] || "Status o'zgartirildi");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Action error:", error);
       messageApi.error("Amalni bajarishda xatolik yuz berdi");
     },
   });
@@ -191,14 +201,6 @@ export default function ApplicationDetailPage() {
     },
   });
 
-  const deleteAttachmentMutation = useMutation({
-    mutationFn: (attachmentId) => baseURL.delete(`/v1/attachments/${attachmentId}/`),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["attachments", id]);
-      messageApi.success("Fayl o'chirildi");
-    },
-  });
-
   // ================= HELPERS =================
   const getFileIcon = (fileName) => {
     const ext = fileName?.split(".").pop()?.toLowerCase();
@@ -214,26 +216,22 @@ export default function ApplicationDetailPage() {
     return dayjs(date).format("DD.MM.YYYY HH:mm");
   };
 
-  // Get status data based on current status
   const getCurrentStatusData = () => {
     return statusMap[data?.status] || { label: data?.status || "Noma'lum", color: "default", icon: <FileText size={14} />, step: 0, percent: 0 };
   };
 
-  // Get percent based on status
   const getProgressPercent = () => {
     const statusData = statusMap[data?.status];
     if (!statusData) return 0;
     return statusData.percent;
   };
 
-  // Get step index for Steps component
   const getCurrentStep = () => {
     const statusData = statusMap[data?.status];
     if (!statusData) return 0;
     return statusData.step;
   };
 
-  // Get progress status
   const getProgressStatus = () => {
     if (data?.status === "closed") return "success";
     if (data?.status === "reopened") return "exception";
@@ -241,13 +239,6 @@ export default function ApplicationDetailPage() {
     return "active";
   };
 
-  // Steps items based on correct workflow order:
-  // 1. Yangi (Ariza qabul qilindi)
-  // 2. Mahallaga yuborildi
-  // 3. Qabul qilindi
-  // 4. Ko'rib chiqilmoqda
-  // 5. Tekshirildi
-  // 6. Yopildi
   const stepsItems = [
     { title: "Yangi", description: formatDate(data?.created_at) },
     { title: "Mahallaga yuborildi" },
@@ -256,6 +247,12 @@ export default function ApplicationDetailPage() {
     { title: "Tekshirildi" },
     { title: "Yopildi" },
   ];
+
+  // Check if buttons should be shown based on current status
+  const showArchive = data?.status !== "archived" && data?.status !== "archive";
+  const showClose = data?.status !== "closed" && data?.status !== "archived" && data?.status !== "archive";
+  const showReopen = data?.status === "closed";
+  const showSendToMahalla = data?.status !== "sent_to_mahalla" && data?.status !== "send-to-mahalla" && data?.status !== "closed" && data?.status !== "archived" && data?.status !== "archive";
 
   // ================= UI =================
   if (isLoading) {
@@ -286,7 +283,7 @@ export default function ApplicationDetailPage() {
       {contextHolder}
 
       {/* Hero Section */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-white border-b border-gray-200 shadow-sm rounded-t-xl">
         <div className="px-5 py-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <Space size="middle">
@@ -300,11 +297,11 @@ export default function ApplicationDetailPage() {
               </Button>
               <Divider type="vertical" className="h-8" />
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <Title level={4} className="!mb-0">
                     Ariza #{data.app_number || data.id}
                   </Title>
-                  <Space size="small">
+                  <Space size="small" wrap>
                     <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full ${
                       statusData.color === "blue" ? "bg-blue-50 text-blue-700" : 
                       statusData.color === "orange" ? "bg-orange-50 text-orange-700" : 
@@ -334,15 +331,20 @@ export default function ApplicationDetailPage() {
             </Space>
 
             <Space size="small" wrap>
-              <Tooltip title="Tahrirlash">
-                <Button 
-                  icon={<Edit2 size={16} />} 
-                  onClick={() => setEditOpen(true)}
-                >
-                  Tahrirlash
-                </Button>
-              </Tooltip>
-              {data.status !== "archive" && data.status !== "archived" && (
+              {/* Tahrirlash - only for super_admin */}
+              {canEdit && (
+                <Tooltip title="Tahrirlash">
+                  <Button 
+                    icon={<Edit2 size={16} />} 
+                    onClick={() => setEditOpen(true)}
+                  >
+                    Tahrirlash
+                  </Button>
+                </Tooltip>
+              )}
+              
+              {/* Arxivlash - for super_admin and hokim */}
+              {canArchive && showArchive && (
                 <Tooltip title="Arxivlash">
                   <Button 
                     icon={<Archive size={16} />} 
@@ -352,7 +354,9 @@ export default function ApplicationDetailPage() {
                   </Button>
                 </Tooltip>
               )}
-              {data.status !== "closed" && data.status !== "archive" && data.status !== "archived" && (
+              
+              {/* Yopish - for super_admin and hokim */}
+              {canClose && showClose && (
                 <Tooltip title="Yopish">
                   <Button 
                     danger
@@ -363,7 +367,9 @@ export default function ApplicationDetailPage() {
                   </Button>
                 </Tooltip>
               )}
-              {data.status === "closed" && (
+              
+              {/* Qayta ochish - for super_admin and hokim */}
+              {canReopen && showReopen && (
                 <Tooltip title="Qayta ochish">
                   <Button 
                     icon={<RotateCcw size={16} />} 
@@ -373,7 +379,9 @@ export default function ApplicationDetailPage() {
                   </Button>
                 </Tooltip>
               )}
-              {data.status !== "send-to-mahalla" && data.status !== "sent_to_mahalla" && data.status !== "closed" && data.status !== "archive" && data.status !== "archived" && (
+              
+              {/* Mahallaga yuborish - for super_admin and hokim */}
+              {canSendToMahalla && showSendToMahalla && (
                 <Tooltip title="Mahallaga yuborish">
                   <Button 
                     type="primary"
@@ -389,12 +397,13 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
-      <div className="py-8">
+      {/* Ariza matni */}
+      <div className="mt-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Application Content */}
-            <Card className="shadow-sm rounded-xl border-0">
+            <Card className="shadow-sm rounded-xl border-0 !mb-4">
               <div className="flex items-center gap-2 mb-4">
                 <FileText size={20} className="text-blue-500" />
                 <Title level={5} className="!mb-0">Ariza matni</Title>
@@ -406,7 +415,7 @@ export default function ApplicationDetailPage() {
               <Divider className="my-4" />
               
               <Row gutter={[16, 16]}>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock size={16} />
                     <Text type="secondary">Bajarish muddati:</Text>
@@ -416,7 +425,7 @@ export default function ApplicationDetailPage() {
                     </Text>
                   </div>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <div className="flex items-center gap-2 text-gray-600">
                     <Calendar size={16} />
                     <Text type="secondary">Yopilgan vaqt:</Text>
@@ -426,134 +435,92 @@ export default function ApplicationDetailPage() {
               </Row>
             </Card>
 
-            {/* Attachments */}
-            <Card className="shadow-sm rounded-xl border-0">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Paperclip size={20} className="text-blue-500" />
-                  <Title level={5} className="!mb-0">Fayllar</Title>
-                  <Badge count={attachments.length} showZero />
-                </div>
-                <Upload
-                  beforeUpload={(file) => {
-                    uploadMutation.mutate(file);
-                    return false;
-                  }}
-                  showUploadList={false}
-                >
-                  <Button type="primary" icon={<UploadCloud size={16} />}>
-                    Fayl yuklash
-                  </Button>
-                </Upload>
-              </div>
-
-              {attachments.length === 0 ? (
-                <Alert
-                  message="Hech qanday fayl mavjud emas"
-                  description="Fayl yuklash tugmasi orqali fayl qo'shishingiz mumkin"
-                  type="info"
-                  showIcon
-                  className="bg-gray-50"
-                />
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {attachments.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+            {/* Attachments - only if user has permission */}
+            {canViewTimeline && (
+              <Card className="shadow-sm rounded-xl border-0">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <Paperclip size={20} className="text-blue-500" />
+                    <Title level={5} className="!mb-0">Fayllar</Title>
+                    <Badge count={attachments.length} showZero />
+                  </div>
+                  {canUpload && (
+                    <Upload
+                      beforeUpload={(file) => {
+                        uploadMutation.mutate(file);
+                        return false;
+                      }}
+                      showUploadList={false}
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Avatar 
-                          size={40} 
-                          className="bg-blue-100"
-                          icon={<FileText size={20} className="text-blue-500" />}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Text className="font-medium truncate block">
-                            {file.file?.split("/").pop() || "Fayl"}
-                          </Text>
-                          <Text type="secondary" className="text-xs">
-                            {formatDate(file.created_at)}
-                          </Text>
-                        </div>
-                      </div>
-                      <Space size="small">
-                        <Tooltip title="Ko'rish">
-                          <Button 
-                            type="text" 
-                            size="small"
-                            icon={<Eye size={16} />}
-                            onClick={() => {
-                              setPreviewFile(file);
-                              setPreviewOpen(true);
-                            }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="Yuklab olish">
-                          <Button 
-                            type="text" 
-                            size="small"
-                            icon={<Download size={16} />}
-                            href={file.file}
-                            target="_blank"
-                          />
-                        </Tooltip>
-                        <Tooltip title="O'chirish">
-                          <Button 
-                            type="text" 
-                            size="small"
-                            danger
-                            icon={<Trash2 size={16} />}
-                            onClick={() => deleteAttachmentMutation.mutate(file.id)}
-                          />
-                        </Tooltip>
-                      </Space>
-                    </div>
-                  ))}
+                      <Button type="primary" icon={<UploadCloud size={16} />}>
+                        Fayl yuklash
+                      </Button>
+                    </Upload>
+                  )}
                 </div>
-              )}
-            </Card>
 
-            {/* Timeline */}
-            <Card className="shadow-sm rounded-xl border-0">
-              <div className="flex items-center gap-2 mb-4">
-                <History size={20} className="text-blue-500" />
-                <Title level={5} className="!mb-0">Tarix</Title>
-              </div>
-              
-              {timeline.length === 0 ? (
-                <Alert message="Hech qanday tarix mavjud emas" type="info" showIcon />
-              ) : (
-                <Timeline
-                  items={timeline.map((item, index) => ({
-                    color: index === timeline.length - 1 ? "green" : "blue",
-                    children: (
-                      <div className="pb-2">
-                        <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-                          <Text strong className="capitalize">
-                            {item.action?.replace(/-/g, " ") || "Amal"}
-                          </Text>
-                          <Text type="secondary" className="text-xs">
-                            {formatDate(item.created_at)}
-                          </Text>
+                {attachments.length === 0 ? (
+                  <Alert
+                    message="Hech qanday fayl mavjud emas"
+                    description="Fayl yuklash tugmasi orqali fayl qo'shishingiz mumkin"
+                    type="info"
+                    showIcon
+                    className="bg-gray-50"
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {attachments.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Avatar size={40}  className="bg-blue-100" icon={<FileText size={20} className="text-blue-500" />} />
+                          <div className="flex-1 min-w-0">
+                            <Text className="font-medium truncate block">
+                              {file.file?.split("/").pop() || "Fayl"}
+                            </Text>
+                            <Text type="secondary" className="text-xs">
+                              {formatDate(file.created_at)}
+                            </Text>
+                          </div>
                         </div>
-                        {item.note && (
-                          <Text type="secondary" className="text-sm">
-                            {item.note}
-                          </Text>
-                        )}
+                        <Space size="small">
+                          <Tooltip title="Ko'rish">
+                            <Button 
+                              type="text" 
+                              size="small"
+                              icon={<Eye size={16} />}
+                              onClick={() => {
+                                setPreviewFile(file);
+                                setPreviewOpen(true);
+                              }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="Yuklab olish">
+                            <Button 
+                            onClick={() => console.log(file)}
+                              type="text" 
+                              size="small"
+                              icon={<Download size={16} />}
+                              href={file.file}
+                              target="_blank"
+                            />
+                          </Tooltip>
+                        </Space>
                       </div>
-                    ),
-                  }))}
-                />
-              )}
-            </Card>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+            
           </div>
 
           {/* Right Column - Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-1">
             {/* Citizen Information */}
-            <Card className="shadow-sm rounded-xl border-0">
+            <Card className="shadow-sm rounded-xl border-0 !mb-4">
               <div className="flex items-center gap-2 mb-4">
                 <User size={20} className="text-blue-500" />
                 <Title level={5} className="!mb-0">Fuqaro ma'lumotlari</Title>
@@ -569,12 +536,16 @@ export default function ApplicationDetailPage() {
                 <Descriptions.Item label={<Space><Home size={14} /> Manzil</Space>}>
                   <Text>{data.address_text}</Text>
                 </Descriptions.Item>
-                <Descriptions.Item label={<Space><Building size={14} /> Mahalla</Space>}>
-                  <Text>{mahalla?.name || "-"}</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label={<Space><MapPin size={14} /> Tuman</Space>}>
-                  <Text>{mahalla?.district || "-"}</Text>
-                </Descriptions.Item>
+                {role !== "service_staff" && (
+                  <>
+                    <Descriptions.Item label={<Space><Building size={14} /> Mahalla</Space>}>
+                      <Text>{mahalla?.name || "-"}</Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label={<Space><MapPin size={14} /> Tuman</Space>}>
+                      <Text>{mahalla?.district || "-"}</Text>
+                    </Descriptions.Item>
+                  </>
+                )}
               </Descriptions>
             </Card>
 
@@ -618,7 +589,7 @@ export default function ApplicationDetailPage() {
         </div>
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Modal - only visible for super_admin */}
       <Modal
         title={
           <div className="flex items-center gap-2">
