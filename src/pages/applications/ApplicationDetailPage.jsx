@@ -50,6 +50,7 @@ import {
   Eye,
   Trash2,
   MoreVertical,
+  ArchiveRestore,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
@@ -70,14 +71,14 @@ const { Title, Text, Paragraph } = Typography;
 // Status Map - Correct workflow order
 const statusMap = {
   new: { label: "Yangi", color: "blue", icon: <FileText size={14} />, status: "processing", step: 0, percent: 0 },
-  sent_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "active", step: 1, percent: 20 },
-  acknowledged: { label: "Qabul qilindi", color: "cyan", icon: <CheckCircle size={14} />, status: "active", step: 2, percent: 40 },
-  in_review: { label: "Ko'rib chiqilmoqda", color: "orange", icon: <Eye size={14} />, status: "active", step: 3, percent: 60 },
+  in_review: { label: "Ko'rib chiqilmoqda", color: "orange", icon: <Eye size={14} />, status: "active", step: 1, percent: 20 },
+  sent_to_mahalla: { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "active", step: 2, percent: 40 },
+  acknowledged: { label: "Qabul qilindi", color: "cyan", icon: <CheckCircle size={14} />, status: "active", step: 3, percent: 60 },
   inspected: { label: "Tekshirildi", color: "purple", icon: <CheckCircle size={14} />, status: "active", step: 4, percent: 80 },
   closed: { label: "Yopilgan", color: "red", icon: <CheckCircle size={14} />, status: "success", step: 5, percent: 100 },
   archived: { label: "Arxivlangan", color: "default", icon: <Archive size={14} />, status: "default", step: 5, percent: 100 },
   reopened: { label: "Qayta ochilgan", color: "orange", icon: <RotateCcw size={14} />, status: "warning", step: 1, percent: 20 },
-  "send-to-mahalla": { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "success", step: 1, percent: 20 },
+  "send-to-mahalla": { label: "Mahallaga yuborilgan", color: "green", icon: <Send size={14} />, status: "success", step: 2, percent: 40 },
 };
 
 const priorityMap = {
@@ -143,7 +144,7 @@ export default function ApplicationDetailPage() {
       console.log("Attachments response:", res.data);
       return res.data;
     },
-    enabled: canViewTimeline, // Only fetch if user has permission
+    enabled: canViewTimeline,
   });
 
   const { data: timeline = [] } = useQuery({
@@ -152,7 +153,7 @@ export default function ApplicationDetailPage() {
       const res = await baseURL.get(`/v1/applications/${id}/timeline/`);
       return res.data;
     },
-    enabled: canViewTimeline, // Only fetch if user has permission
+    enabled: canViewTimeline,
   });
 
   // ================= MUTATIONS =================
@@ -207,7 +208,7 @@ export default function ApplicationDetailPage() {
     if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) return "image";
     if (["pdf"].includes(ext)) return "pdf";
     if (["doc", "docx"].includes(ext)) return "word";
-    if (["xls", "xlsx"].includes(ext)) return "excel";
+    if ("xls", "xlsx".includes(ext)) return "excel";
     return "file";
   };
 
@@ -239,11 +240,18 @@ export default function ApplicationDetailPage() {
     return "active";
   };
 
+  // Steps items in correct order:
+  // 1. Yangi
+  // 2. Ko'rib chiqilmoqda
+  // 3. Mahallaga yuborildi
+  // 4. Qabul qilindi
+  // 5. Tekshirildi
+  // 6. Yopildi
   const stepsItems = [
     { title: "Yangi", description: formatDate(data?.created_at) },
+    { title: "Ko'rib chiqilmoqda" },
     { title: "Mahallaga yuborildi" },
     { title: "Qabul qilindi" },
-    { title: "Ko'rib chiqilmoqda" },
     { title: "Tekshirildi" },
     { title: "Yopildi" },
   ];
@@ -251,8 +259,11 @@ export default function ApplicationDetailPage() {
   // Check if buttons should be shown based on current status
   const showArchive = data?.status !== "archived" && data?.status !== "archive";
   const showClose = data?.status !== "closed" && data?.status !== "archived" && data?.status !== "archive";
-  const showReopen = data?.status === "closed";
+  const showReopen = data?.status === "closed" || data?.status === "archived" || data?.status === "archive";
   const showSendToMahalla = data?.status !== "sent_to_mahalla" && data?.status !== "send-to-mahalla" && data?.status !== "closed" && data?.status !== "archived" && data?.status !== "archive";
+  
+  // Check if application is archived
+  const isArchived = data?.status === "archived" || data?.status === "archive";
 
   // ================= UI =================
   if (isLoading) {
@@ -364,18 +375,6 @@ export default function ApplicationDetailPage() {
                     onClick={() => actionMutation.mutate("close")}
                   >
                     Yopish
-                  </Button>
-                </Tooltip>
-              )}
-              
-              {/* Qayta ochish - for super_admin and hokim */}
-              {canReopen && showReopen && (
-                <Tooltip title="Qayta ochish">
-                  <Button 
-                    icon={<RotateCcw size={16} />} 
-                    onClick={() => actionMutation.mutate("reopen")}
-                  >
-                    Qayta ochish
                   </Button>
                 </Tooltip>
               )}
@@ -552,38 +551,64 @@ export default function ApplicationDetailPage() {
             {/* Progress Section */}
             <Card className="shadow-sm rounded-xl border-0">
               <div className="flex items-center gap-2 mb-4">
-                <Info size={20} className="text-blue-500" />
-                <Title level={5} className="!mb-0">Bajarilish holati</Title>
+                {isArchived ? (
+                  <ArchiveRestore size={20} className="text-orange-500" />
+                ) : (
+                  <Info size={20} className="text-blue-500" />
+                )}
+                <Title level={5} className="!mb-0">
+                  {isArchived ? "Arxivlangan" : "Bajarilish holati"}
+                </Title>
               </div>
               
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between mb-2">
-                    <Text type="secondary">Bajarilish foizi</Text>
-                    <Text strong className={progressPercent === 100 ? "text-green-600" : ""}>
-                      {progressPercent}%
-                    </Text>
+              {isArchived ? (
+                <div className="text-center py-3">
+                  <ArchiveRestore size={48} className="text-gray-400 mx-auto mb-3" />
+                  <Text className="text-gray-500">Bu ariza arxivlangan</Text>
+                  <br /> <br />
+                  {/* Qayta ochish - for super_admin and hokim (yopilgan yoki arxivlangan) */}
+                  {canReopen && showReopen && (
+                    <Tooltip>
+                      <Button 
+                        icon={<RotateCcw size={16} />} 
+                        type="primary"
+                        onClick={() => actionMutation.mutate("reopen")}
+                      >
+                        Qayta ochish
+                      </Button>
+                    </Tooltip>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex justify-between mb-2">
+                      <Text type="secondary">Bajarilish foizi</Text>
+                      <Text strong className={progressPercent === 100 ? "text-green-600" : ""}>
+                        {progressPercent}%
+                      </Text>
+                    </div>
+                    <Progress 
+                      percent={progressPercent}
+                      status={progressStatus}
+                      strokeColor={progressPercent === 100 ? "#10b981" : progressStatus === "exception" ? "#ef4444" : "#3b82f6"}
+                      showInfo={false}
+                    />
                   </div>
-                  <Progress 
-                    percent={progressPercent}
+                  
+                  <Steps
+                    direction="vertical"
+                    size="small"
+                    current={currentStep}
                     status={progressStatus}
-                    strokeColor={progressPercent === 100 ? "#10b981" : progressStatus === "exception" ? "#ef4444" : "#3b82f6"}
-                    showInfo={false}
+                    items={stepsItems.map((item, idx) => ({
+                      title: item.title,
+                      description: idx === 0 ? item.description : null,
+                      status: idx <= currentStep ? "finish" : "wait",
+                    }))}
                   />
                 </div>
-                
-                <Steps
-                  direction="vertical"
-                  size="small"
-                  current={currentStep}
-                  status={progressStatus}
-                  items={stepsItems.map((item, idx) => ({
-                    title: item.title,
-                    description: idx === 0 ? item.description : null,
-                    status: idx <= currentStep ? "finish" : "wait",
-                  }))}
-                />
-              </div>
+              )}
             </Card>
           </div>
         </div>

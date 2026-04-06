@@ -165,16 +165,56 @@ const ApplicationsPage = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [activeTab, setActiveTab] = useState("all");
   const [showFilters, setShowFilters] = useState(true);
+  
+  // Pagination state for server-side pagination
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [allData, setAllData] = useState([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPageData, setCurrentPageData] = useState([]);
 
-  // FETCH APPLICATIONS
-  const { data: applications = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["applications"],
+  // FETCH APPLICATIONS with server-side pagination
+  const { isLoading, isError, refetch } = useQuery({
+    queryKey: ["applications", page],
     queryFn: async () => {
-      const res = await baseURL.get("/v1/applications/");
-      console.log(res.data.results);
-      return res.data.results || [];
+      const res = await baseURL.get(`/v1/applications/?page=${page}`);
+      console.log("Applications data:", res.data);
+      setTotal(res.data.count);
+      
+      // Store all fetched data for filtering
+      setAllData(prev => {
+        const newData = [...prev];
+        // Only add new data if page is new
+        if (page === 1) {
+          return [...res.data.results];
+        } else {
+          // Merge without duplicates by id
+          const existingIds = new Set(prev.map(item => item.id));
+          const newItems = res.data.results.filter(item => !existingIds.has(item.id));
+          return [...prev, ...newItems];
+        }
+      });
+      
+      return res.data;
     },
+    keepPreviousData: true,
   });
+
+  // Get current page data directly from API response
+  const { data: currentData, refetch: refetchPage } = useQuery({
+    queryKey: ["applications-page", page],
+    queryFn: async () => {
+      const res = await baseURL.get(`/v1/applications/?page=${page}`);
+      setTotal(res.data.count);
+      setCurrentPageData(res.data.results || []);
+      return res.data;
+    },
+    keepPreviousData: true,
+  });
+
+  // Use current page data for table
+  const applications = currentData?.results || [];
 
   // FETCH SERVICES - only for super_admin
   const { data: services = [] } = useQuery({
@@ -196,6 +236,41 @@ const ApplicationsPage = () => {
     },
   });
 
+  // FILTERING on current page data only (since server-side pagination)
+  const filtered = useMemo(() => {
+    let filteredData = applications.filter((a) => {
+      const matchSearch =
+        !search ||
+        a.citizen_name?.toLowerCase().includes(search.toLowerCase()) ||
+        String(a.id).includes(search) ||
+        a.app_number?.toLowerCase().includes(search.toLowerCase());
+
+      const matchStatus = !statusFilter || a.status === statusFilter;
+
+      const created = new Date(a.created_at).getTime();
+      const matchDate =
+        !dateRange.length ||
+        (created >= dateRange[0]?.startOf("day").valueOf() &&
+          created <= dateRange[1]?.endOf("day").valueOf());
+
+      return matchSearch && matchStatus && matchDate;
+    });
+
+    if (activeTab === "new") {
+      filteredData = filteredData.filter(a => a.status === "new");
+    } else if (activeTab === "in_review") {
+      filteredData = filteredData.filter(a => a.status === "in_review");
+    } else if (activeTab === "sent_to_mahalla") {
+      filteredData = filteredData.filter(a => a.status === "sent_to_mahalla");
+    } else if (activeTab === "closed") {
+      filteredData = filteredData.filter(a => a.status === "closed");
+    } else if (activeTab === "high-priority") {
+      filteredData = filteredData.filter(a => a.priority === "high" || a.priority === "urgent");
+    }
+
+    return filteredData;
+  }, [applications, search, statusFilter, dateRange, activeTab]);
+
   // CREATE APPLICATION
   const createMutation = useMutation({
     mutationFn: async (data) => {
@@ -203,7 +278,8 @@ const ApplicationsPage = () => {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["applications"]);
+      queryClient.invalidateQueries(["applications", page]);
+      queryClient.invalidateQueries(["applications-page", page]);
       messageApi.success({
         content: "Hisobot muvaffaqiyatli qo'shildi",
         icon: <CheckCircleOutlined />,
@@ -225,7 +301,8 @@ const ApplicationsPage = () => {
       return res.data;
     },
     onSuccess: (_, { action }) => {
-      queryClient.invalidateQueries(["applications"]);
+      queryClient.invalidateQueries(["applications", page]);
+      queryClient.invalidateQueries(["applications-page", page]);
       const actionMessages = {
         archive: "Ariza arxivlandi",
         close: "Ariza yopildi",
@@ -261,56 +338,21 @@ const ApplicationsPage = () => {
     attachments: "Fayllarni ko'rish",
   };
 
-  // Statistics
+  // Statistics (from total count)
   const statistics = useMemo(() => {
-    const total = applications.length;
+    const totalApps = total;
+    // For percentages we need actual counts, which we don't have from server
+    // So we'll use the current page data for counts
     const newCount = applications.filter(a => a.status === "new").length;
     const inReviewCount = applications.filter(a => a.status === "in_review").length;
     const sentToMahallaCount = applications.filter(a => a.status === "sent_to_mahalla").length;
-    const acknowledgedCount = applications.filter(a => a.status === "acknowledged").length;
-    const inspectedCount = applications.filter(a => a.status === "inspected").length;
     const closedCount = applications.filter(a => a.status === "closed").length;
     const highPriorityCount = applications.filter(a => a.priority === "high" || a.priority === "urgent").length;
     
-    const getPercent = (value) => total === 0 ? 0 : (value / total) * 100;
+    const getPercent = (value) => totalApps === 0 ? 0 : (value / totalApps) * 100;
     
-    return { total, newCount, inReviewCount, sentToMahallaCount, acknowledgedCount, inspectedCount, closedCount, highPriorityCount, getPercent };
-  }, [applications]);
-
-  // FILTERING
-  const filtered = useMemo(() => {
-    let filteredData = applications.filter((a) => {
-      const matchSearch =
-        !search ||
-        a.citizen_name?.toLowerCase().includes(search.toLowerCase()) ||
-        String(a.id).includes(search) ||
-        a.app_number?.toLowerCase().includes(search.toLowerCase());
-
-      const matchStatus = !statusFilter || a.status === statusFilter;
-
-      const created = new Date(a.created_at).getTime();
-      const matchDate =
-        !dateRange.length ||
-        (created >= dateRange[0]?.startOf("day").valueOf() &&
-          created <= dateRange[1]?.endOf("day").valueOf());
-
-      return matchSearch && matchStatus && matchDate;
-    });
-
-    if (activeTab === "new") {
-      filteredData = filteredData.filter(a => a.status === "new");
-    } else if (activeTab === "in_review") {
-      filteredData = filteredData.filter(a => a.status === "in_review");
-    } else if (activeTab === "sent_to_mahalla") {
-      filteredData = filteredData.filter(a => a.status === "sent_to_mahalla");
-    } else if (activeTab === "closed") {
-      filteredData = filteredData.filter(a => a.status === "closed");
-    } else if (activeTab === "high-priority") {
-      filteredData = filteredData.filter(a => a.priority === "high" || a.priority === "urgent");
-    }
-
-    return filteredData;
-  }, [applications, search, statusFilter, dateRange, activeTab]);
+    return { total: totalApps, newCount, inReviewCount, sentToMahallaCount, closedCount, highPriorityCount, getPercent };
+  }, [total, applications]);
 
   // CREATE HANDLER
   const handleCreate = () => {
@@ -322,7 +364,6 @@ const ApplicationsPage = () => {
       };
 
       const servisIDTemp = localStorage.getItem('service');
-      console.log("aaa",servisIDTemp, role)
       
       if (role === "service_staff" && servisIDTemp) {
         payload.service = servisIDTemp;
@@ -659,6 +700,7 @@ const ApplicationsPage = () => {
                       setSearch("");
                       setStatusFilter(undefined);
                       setDateRange([]);
+                      setPage(1);
                       refetch();
                     }}
                     className="w-full"
@@ -672,7 +714,7 @@ const ApplicationsPage = () => {
 
           <Divider className="my-4" />
 
-          {/* Table */}
+          {/* Table with server-side pagination */}
           <Table
             dataSource={filtered}
             columns={columns}
@@ -682,9 +724,19 @@ const ApplicationsPage = () => {
               className: "cursor-pointer hover:bg-gray-50 transition-colors",
             })}
             pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
+              current: page,
+              pageSize: pageSize,
+              total: total,
+              onChange: (p) => {
+                setPage(p);
+                // Reset filters when changing page
+                setSearch("");
+                setStatusFilter(undefined);
+                setDateRange([]);
+              },
+              showSizeChanger: false,
               showTotal: (total, range) => `${range[0]}-${range[1]} dan ${total} ta`,
+              className: "mt-4",
             }}
             scroll={{ x: 1000 }}
             locale={{
